@@ -1,3 +1,19 @@
+# =============================================================================
+# SemBench L1 vendored 副本 — caesura/main.py
+# =============================================================================
+# 教学注释 pass (L1 MODIFY) by Claude.
+# 这是 L0 [AllSQPE/CAESURA/caesura/main.py](../../../../../../AllSQPE/CAESURA/caesura/main.py) 的 vendored 副本,
+# 含 3 处 patch (相对 L0 +21 行), 加 *per-query lifecycle* 支持 SemBench 跨 query 复用 agent。
+#
+# Patch 位置 (本文件):
+#   1. line 41         : self.last_result = None       — __init__ 新字段
+#   2. line 87-88      : self.llm.reset_token_usage()  — run() 开头 reset token 计数
+#   3. line 104        : self.last_result = final_result — run() finally 存最后结果
+#   4. line 113-131    : get_final_result() / get_token_usage() / reset_for_new_query() — 3 个新方法
+#
+# byte-identical 部分 (大部分代码) 的详细教学注释见 L0 文件; 本副本只标记 patch 区段。
+# 详 [CAESURA LOG_STRUCTURE.md §10.1.2](../../../../../../AllSQPE/CAESURA/LOG_STRUCTURE.md#1012-l1-modify--vendored-包内被改动的文件3-个)。
+# =============================================================================
 from pathlib import Path
 import langchain
 import logging
@@ -38,6 +54,10 @@ class Caesura():
         self.max_num_errors = MAX_NUM_ERRORS[model_name]
         self.log_path = log_path
         self.file_handler = None
+        # === L1 PATCH (line 41) ===
+        # 新增字段, 存最近一次 run(query) 的 final DataFrame (Table 实例).
+        # L0 没这个字段 — agent 跑完一个 query 后, 结果就丢了, 无法从外部 *后续访问*.
+        # SemBench wrapper 需要 agent.run(q) 后 agent.get_final_result() 拿 DataFrame, 所以加这个 cache.
         self.last_result = None
 
         # setup
@@ -84,9 +104,15 @@ class Caesura():
         final_plan = None
         final_result = None
         
+
+        # === L1 PATCH (line 87-88) ===
+        # 每次 run(query) 开头 reset MyOpenAI 的 total_*_tokens 计数器为 0.
+        # L0 没这个 — token 计数会 *跨 query 累加*, 第二个 query 的 cost 看不出来.
+        # MyOpenAI.reset_token_usage 见 L1 patch in model.py.
         # Reset token usage at start of query
         self.llm.reset_token_usage()
         
+
         while num_tries < self.max_num_tries:
             try:
                 final_plan = self.phases.run(query=query, tools=self.tools)
@@ -101,6 +127,10 @@ class Caesura():
             finally:
                 num_tries += 1
                 final_result = self.database.final_result()
+                # === L1 PATCH (line 104) ===
+                # 在 clear_working_set() 之前把 final_result 缓存到 self.last_result,
+                # 否则下一行 clear_working_set 会让 database.final_result() 返回 None.
+                # 这是 L0 → L1 的关键 timing — L0 不需要保留 final_result 跨 clear; L1 需要让 wrapper 后续读取.
                 self.last_result = final_result
                 self.database.clear_working_set()
 
@@ -111,16 +141,42 @@ class Caesura():
             return
         self.log_final_plan(query, final_plan, final_result)
     
+
+    # =========================================================================
+    # === L1 PATCH (line 113-131) — 3 个新方法暴露给 SemBench wrapper 用
+    # =========================================================================
+    # L0 没有这些方法. 它们组成 L1 跨 query 复用 agent 实例的核心 API:
+    #   - get_final_result()     : 取上轮 query 的 DataFrame (取 self.last_result, L1 PATCH line 104 填的)
+    #   - get_token_usage()      : 转发到 MyOpenAI.get_token_usage(); 拿 prompt/completion/total tokens dict
+    #   - reset_for_new_query()  : 把 agent 状态全清 (phases / tools / working_set / token counter), 准备跑下一 query
+    #
+    # SemBench 调用顺序:
+    #   GenericCaesuraRunner.execute_caesura_query()  →
+    #     agent.reset_for_new_query()    [清状态]
+    #     agent.run(query_text)          [跑 4-Phase]
+    #     agent.get_final_result()       [取 DataFrame]
+    #   后续 _update_token_usage_and_cost():
+    #     agent.get_token_usage()        [拿 token dict]
+    # =========================================================================
+
     def get_final_result(self):
         """Get the final result from the last query execution."""
+        # 简单 getter; self.last_result 由 run() 内 L1 PATCH (line 104) 设置
         return self.last_result
     
+
     def get_token_usage(self):
         """Get token usage from the LLM."""
+        # 转发到 MyOpenAI (L1 patched, 见 model.py 新增的 get_token_usage 方法)
+        # 返回 dict(prompt_tokens, completion_tokens, total_tokens)
         return self.llm.get_token_usage()
     
+
     def reset_for_new_query(self):
         """Reset the agent state for a new query execution."""
+        # 完整重置 agent 状态 — 让单个 agent 实例能跨 N 个 query 复用而不污染状态。
+        # 注意: *不重新创建 MyOpenAI* — 保留 LLM 实例 (省去模型重加载和 langchain SQLiteCache 初始化)
+        # 与 restart_after_error 的区别: 后者会 *new 一个 MyOpenAI* 并提高 temperature, 这里只 reset 状态
         # Reset phases
         self.setup_phases()
         # Reset tools 
