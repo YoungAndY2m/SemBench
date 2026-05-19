@@ -4,6 +4,62 @@ Created on June 4, 2025
 @author: Jiale Lao
 
 An enhanced plotting module with improved visualizations.
+
+============================================================================
+教学注释 pass (CLAUDE.md §5.5 全面注释)
+============================================================================
+
+本文件在 SemBench pipeline 里的位置
+------------------------------------
+benchmark 跑完 → 各 system 的 metrics/{sys}.json 落盘 → plot.py 读这些
+JSON → 画 PNG / PDF 到 figures/{scenario}/ 用于论文 SIGMOD 投稿.
+
+依赖外部库说明
+--------------
+- matplotlib.pyplot       核心 2D 绘图库; plt.figure / plt.bar / plt.plot
+- matplotlib.patches      画补丁形状 (rectangle / circle), 用于 legend
+- matplotlib.lines.Line2D 画自定义线 (legend marker / pareto frontier)
+- seaborn (sns)           matplotlib 顶层包装, 提供"漂亮"统计图模板
+- natsort.natsorted       *自然顺序排序* — sorted 把 'Q10' 排在 'Q2' 前 (字典序),
+                          natsorted 按数字识别 Q2 < Q10 (人类预期).
+- tomli                   读 ecomm scenario 的 query/*.toml metadata (e.g.
+                          accuracy_metric 类型).
+- scipy.stats.gmean       几何均值 (用于 cross-query 综合 metric, 几何均值
+                          比算术均值对极端值更稳健; 例 [0.1, 1.0, 10] 几何
+                          均值 = 1.0, 算术 = 3.7).
+- numpy / pandas          数据操作 (默认依赖)
+
+排版常量
+--------
+latex_full_width          = 7.03 inch (ACM 两栏论文跨整页)
+latex_single_column_width = 3.35 inch (ACM 单栏)
+matplotlib rcParams 设置全局样式 (whitegrid / 1.5 线宽 / publication 字号)
+让 figure 直接可用论文不再后期 PS.
+
+主体类 BenchmarkPlotter (本文件 99% 内容)
+-----------------------------------------
+负责:
+  *数据装载*  从 files/{scenario}/metrics/ 读 system JSON
+  *颜色规划*  统一各 system 用同色 / 不同 hatch (color-blind friendly)
+  *图表类型*  ~10 种, 大致分 4 大类:
+    1. **Per-metric bar chart**  (1 figure / metric)
+         plot_execution_time / plot_cost / plot_quality
+    2. **Single-metric drill-down**  (per accuracy metric)
+         plot_quality_one_metric (按 metric type 拆: F1 / MAPE / ARI / ...)
+    3. **Pareto frontier**  (cost vs quality trade-off)
+         plot_pareto / plot_pareto_curve / plot_pareto_across_all_use_cases /
+         _plot_pareto_from_metrics_data
+    4. **Cross-system / cross-scenario summary**
+         plot_summary_across_systems / plot_summary_across_systems_with_error_bar /
+         plot_avg_cost_accuracy_ratio_per_use_case
+
+输出落盘
+--------
+figures/{scenario}/{plot_type}_{system_or_metric}.{png,pdf}
+论文用通常生成 .pdf (矢量, 不糊), 草稿生成 .png (查阅快).
+
+引用: [LOG_STRUCTURE.md §5.5 可视化与分析](../LOG_STRUCTURE.md)
+============================================================================
 """
 
 import glob
@@ -39,6 +95,59 @@ latex_full_width = 7.031875  # Width of a figure stretching across the whole pag
 latex_single_column_width = 3.349263889  # Width of a figure stretching a single column in ACM two-column layout in inches.
 
 
+# ============================================================================
+# BenchmarkPlotter — 全 plotting 工作的入口类 (~32 methods)
+# ============================================================================
+# 方法分组 (按用途, 按文件出现顺序):
+#
+# ─ 工具 helper (无副作用, 纯计算 / 配色):
+#   __init__                     设 base_dir / files_dir / figures_dir + 23 色 palette
+#   get_system_color             system 名 → 固定颜色 (论文一致)
+#   get_system_pattern           system 名 → 填充 hatch (B/W 印刷下区分)
+#   unify_accuracy_metric        把不同 metric 名归一 (e.g. f1/F1 score → F1)
+#   max_overlap_of_n_sets        N 个 set 取交集 (找共同 query)
+#   add_legend_with_layout       手工 legend (matplotlib 默认 legend 不够漂亮)
+#   add_red_mark                 在 bar 上加 × 标记 "system failed"
+#   format_value                 metric 数值格式化 (e.g. 0.0123 → "0.012",
+#                                inf → "∞", 大于 1000 → "1.2k")
+#
+# ─ 数据装载 (读 metrics/*.json):
+#   get_use_cases                列 files/*/metrics/*.json 推出 scenario 集
+#   load_metrics_data            读 1 个 scenario 的所有 system metrics
+#   get_system_subfolders        子目录扫描
+#   load_system_metrics_data     读单 system json
+#   load_all_query_metrics       跨 scenario 把所有 system metrics aggreg
+#
+# ─ Per-metric figure (figures/{sc}/{plot}_*.png):
+#   plot_execution_time          bar chart: 各 system 跑 Q1..QN latency
+#   plot_cost                    bar chart: 各 system token / dollar cost
+#   plot_quality                 bar chart: 各 system accuracy (auto 选 metric)
+#   plot_quality_one_metric      drill-down 单一 metric (P/R/F1/MAPE/...)
+#
+# ─ Pareto 图 (cost-quality trade-off):
+#   plot_pareto                  per-system scatter + frontier 折线
+#   plot_pareto_curve            插值 + smooth pareto curve
+#   plot_pareto_across_all_use_cases
+#                                跨 scenario 平均后的 cross-scenario pareto
+#   plot_avg_cost_accuracy_ratio_per_use_case
+#                                cost/accuracy 比值条形
+#   _generate_pareto_with_aggregated_data
+#                                pareto 内部 helper, 把 (cost, accuracy) 点
+#                                聚合 + 标 frontier
+#   _plot_pareto_from_metrics_data
+#                                上一函数的 plotting 部分
+#   plot_pareto_across_systems   cross-system pareto, 区分 system 用 marker
+#
+# ─ Summary 图 (跨 system, 跨 scenario):
+#   plot_summary_across_systems  cross-system grouped bar
+#   plot_summary_across_systems_with_error_bar
+#                                带 ±σ error bar (跑多次实验拿 std)
+#   plot_summary_2_5_flash       (硬编码 model="gemini-2.5-flash" 的简化版)
+#
+# ─ Top-level dispatcher:
+#   generate_all_plots           调上面所有 plot_X 把整套 figure 跑一遍
+#   plot_palimpzest_pareto_evaluation
+#                                palimpzest 专用 pareto 评估 (单 system)
 class BenchmarkPlotter:
     def __init__(self, base_dir="."):
         self.base_dir = Path(base_dir)
@@ -200,6 +309,11 @@ class BenchmarkPlotter:
             zorder=10,
         )
 
+    # ========================================================================
+    # format_value — 把 metric 数值格式化成 figure 标签 (e.g. "0.012", "∞", "1.2k")
+    # ========================================================================
+    # 不同 metric 范围差异大: F1 ∈ [0,1] 要 3 位小数, latency 可能 1000s 要
+    # 简写 k/M; 还要处理 inf (failed query). 这个函数集中处理.
     def format_value(self, value, metric_type):
         """Format values for display on bars."""
         if metric_type == "execution_time":
@@ -332,6 +446,19 @@ class BenchmarkPlotter:
 
         return metrics_data
 
+    # ========================================================================
+    # plot_execution_time — bar chart: 各 query × 各 system 的 latency
+    # ========================================================================
+    # 输入: metrics_data 形如 {sys_name: {Q1: {execution_time: ...}, ...}}
+    # 输出: figures/{use_case}/execution_time.png + .pdf
+    #
+    # 设计要点:
+    #   - X 轴 grouped by query (Q1, Q2, ..., QN); Y 轴 latency (sec).
+    #   - 每个 system 一种 color + hatch (B/W 印刷区分).
+    #   - failed query 用 add_red_mark 加 × 标记 (高度 = 当前 ylim 的某个固定值,
+    #     避免 inf 撑爆 y 轴).
+    #   - 这是 *最常用* 的 figure 类型, 论文 §6 主图通常就是这个.
+    # 后续 plot_cost / plot_quality 结构类似, 只换 metric.
     def plot_execution_time(self, metrics_data, use_case, system_name=None):
         """Plot execution time comparison with the legend between the title and
         the plot.
@@ -1482,6 +1609,25 @@ class BenchmarkPlotter:
         plt.close()
         print(f"Successfully saved chart to {output_dir / filename}")
 
+    # ========================================================================
+    # plot_pareto — cost vs accuracy 散点图 + frontier 折线
+    # ========================================================================
+    # Pareto frontier (帕累托前沿): 一组点中, 在 *两个目标* (这里 cost +
+    # accuracy) 上没有任何点同时严格好于它的 点的集合.
+    #   ↑ accuracy
+    #   |  ● (Pareto)      ◌ (Dominated, 比 Pareto 点更贵且更差)
+    #   |    \             ◌
+    #   |     ●(Pareto)
+    #   |       \
+    #   |        ● (Pareto)
+    #   +---------------→ cost
+    # 评估 SQPE 选型时, 用户主要关心 Pareto 上的 system (其它 dominated 不
+    # 用考虑).
+    #
+    # 实现:
+    #   1. 把所有 (system, model_config) 抽出 (cost, accuracy) 点.
+    #   2. 排序 + frontier 算法 (单调 stack) 标出 Pareto 集.
+    #   3. matplotlib 散点 + 红线连 Pareto frontier.
     def plot_pareto(self, metrics_data, use_case, system_name=None):
         """
         Plots a compact, publication-quality Pareto analysis.
@@ -4097,6 +4243,18 @@ class BenchmarkPlotter:
         """
         self.plot_summary_across_systems("movie", "across_system_2.5flash")
 
+    # ========================================================================
+    # generate_all_plots — 顶层 dispatcher; main() 调它跑一次出所有 figure
+    # ========================================================================
+    # 大致:
+    #   for use_case in self.get_use_cases():
+    #       metrics = self.load_metrics_data(use_case)
+    #       self.plot_execution_time(metrics, use_case)
+    #       self.plot_cost(metrics, use_case)
+    #       self.plot_quality(metrics, use_case)
+    #       self.plot_pareto(metrics, use_case)
+    #       ... etc
+    # 论文 figure 全套 60+ 张, 这里 ~10 分钟跑完 (matplotlib 单线程渲染).
     def generate_all_plots(self):
         """Generate all plots for all use cases."""
         use_cases = self.get_use_cases()
@@ -4237,6 +4395,12 @@ class BenchmarkPlotter:
         self.plot_avg_cost_accuracy_ratio_per_use_case(all_metrics)
 
 
+# ============================================================================
+# plot_llm_model_scatter_plot — 模块级 helper (类外, 没 self)
+# ============================================================================
+# 跨 model (GPT-4o-mini / Gemini Flash / Claude Haiku / ...) 的 scatter:
+# X 轴 = avg cost, Y 轴 = avg quality, 一个 model 一个点 + 标 model 名.
+# 论文 §6.X "model selection" 子节用; 不属于任何 scenario.
 def plot_llm_model_scatter_plot():
     toml_file_path = os.path.join("src", "models.toml")
     output_image_path = os.path.join("figures", "llm-price-quality.png")
@@ -4596,6 +4760,14 @@ def plot_llm_model_scatter_plot():
         print(f"✅ Palimpzest pareto plots saved to {png_path} and {pdf_path}")
 
 
+# ============================================================================
+# main — 模块级入口, 通常用 `python src/plot.py` 触发
+# ============================================================================
+# 步骤:
+#   1. argparse 收集 flag (e.g. --base-dir / --scenario / --systems).
+#   2. plotter = BenchmarkPlotter(base_dir=...)
+#   3. plotter.generate_all_plots() — 出所有 figure.
+# 直接 `python -m src.plot` 也行 (本文件挂在 src/ 下作为 module).
 def main():
     """Main function to run the benchmark plotter."""
     plotter = BenchmarkPlotter()

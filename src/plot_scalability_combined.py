@@ -1,6 +1,50 @@
 """
 Combined Scalability and Memory Plotting for VLDB Conference Paper
 Creates a single figure with all scenarios and metrics
+
+============================================================================
+教学注释 pass (CLAUDE.md §5.5 全面注释)
+============================================================================
+
+本文件在 SemBench pipeline 里的位置
+------------------------------------
+专门画论文 VLDB 用的 *scalability + memory* 单张大图. 用 matplotlib
+GridSpec 分多 cell 排版: 每行一个 scenario, 每列一个 metric (e.g.
+[scenario × scale-factor latency], [scenario × memory peak]).
+
+为什么有这个独立文件而不是放 plot.py
+-------------------------------------
+plot.py 的 figure 都是 *single scenario, single metric* 一张图; 这里要画
+*跨 scenario 总览图* (论文 §6 motivation figure / overview figure), 用
+GridSpec 拼多 subplot. 独立成文件让 plot.py 不被 cross-scenario logic 污染.
+
+依赖外部库说明
+--------------
+- matplotlib.gridspec.GridSpec   把 figure 分成 m × n grid 的 subplot,
+                                  比 plt.subplots 灵活 (可不规则 share x/y).
+- pdf.fonttype = 42              让 PDF 嵌入 TrueType (Type 42) 字体, 投稿
+                                  必须 (否则 reviewer 系统无字体会乱码).
+
+主体类 CombinedPlotter (~13 methods)
+-----------------------------------
+  数据装载:
+    load_scalability_data         跨 scale_factor 读 metrics
+    load_memory_data              跨 system 读 memory peak metric
+    aggregate_across_repeats      多 round 聚合成单值
+    find_common_queries_*         过滤所有 system 都跑了的 query 子集
+  格式化:
+    format_system_name            'palimpzest' → 'Palimpzest'
+    format_scenario_name          'ecomm' → 'E-commerce'
+    unify_accuracy_metric         metric 名归一
+    extract_metric                从 metric dict 抽 (cost / latency / accuracy)
+  主绘图:
+    plot_combined_figure          ★ 主出口, 出整张大图
+    _plot_scalability_cell        单 cell 内画 scale-factor sweep curve
+    _plot_memory_cell             单 cell 内画 memory bar/curve
+    plot_all                      包顶, 把 plot_combined_figure 包成简单调用
+
+引用: [LOG_STRUCTURE.md §5.5 可视化与分析](../LOG_STRUCTURE.md)
+============================================================================
 """
 
 import json
@@ -291,6 +335,17 @@ class CombinedPlotter:
         return set.intersection(*sf_common_queries) if sf_common_queries else set()
 
     # ================== Combined Plotting ==================
+    # ========================================================================
+    # plot_combined_figure — ★ 主出口: GridSpec 拼多 subplot 出整张论文图
+    # ========================================================================
+    # 大致布局 (论文 motivation figure 形态):
+    #   ┌──────────────┬──────────────┬──────────────┐
+    #   │ Ecomm SF↑   │ Movie SF↑   │ Animals SF↑  │  ← scalability row
+    #   ├──────────────┼──────────────┼──────────────┤
+    #   │ Ecomm mem   │ Movie mem   │ Animals mem  │  ← memory row
+    #   └──────────────┴──────────────┴──────────────┘
+    # 每 cell 调 _plot_scalability_cell / _plot_memory_cell 画.
+    # 输出: figures/combined_scalability_memory_{model_tag}.{png,pdf}
     def plot_combined_figure(
         self,
         scalability_data: Dict[str, Tuple[Dict, Dict]],
@@ -505,6 +560,12 @@ class CombinedPlotter:
         print(f"Saved combined figure: {output_file}")
         plt.close()
 
+    # ========================================================================
+    # _plot_scalability_cell — 单 cell 画 "scale_factor sweep" curve
+    # ========================================================================
+    # X 轴 = scale_factor (e.g. 50 / 200 / 1000 / 5000), Y 轴 = metric
+    # (latency / accuracy / cost). 每 system 一条 line, 用 system_colors 区分.
+    # log scale 通常用于 X (scale_factor 跨 2-3 个量级) + Y (latency).
     def _plot_scalability_cell(
         self, ax, scenario, metric_key, data, all_scale_factors, common_queries,
         systems_exceeded_timeout, system_timeout_sf, linewidth, markersize, error_alpha
@@ -577,6 +638,12 @@ class CombinedPlotter:
             # Error region
             ax.fill_between(sfs, means - stds, means + stds, color=color, alpha=error_alpha)
 
+    # ========================================================================
+    # _plot_memory_cell — 单 cell 画 memory peak bar 或 curve
+    # ========================================================================
+    # Memory peak = system 跑 query 期间 RSS (Resident Set Size, 实际驻留
+    # 物理内存) 峰值, 用 /usr/bin/time -v 或 psutil 收集. 单位: MB / GB.
+    # 通常 bar chart per system; 也可作 vs scale_factor curve.
     def _plot_memory_cell(
         self, ax, scenario, data, scale_factors, common_queries, linewidth, markersize
     ):
@@ -646,6 +713,9 @@ class CombinedPlotter:
         print("\nDone!")
 
 
+# ============================================================================
+# main — 模块级入口, `python src/plot_scalability_combined.py` 触发
+# ============================================================================
 def main():
     """Main entry point."""
     import argparse

@@ -8,6 +8,55 @@ LaTeX tables with:
 - Columns: For each system, two sub-columns (Quality/Latency, Quality/Money)
 
 Created by combining existing modules and enhancing functionality.
+
+============================================================================
+教学注释 pass (CLAUDE.md §5.5 全面注释)
+============================================================================
+
+本文件在 SemBench pipeline 里的位置
+------------------------------------
+与 [src/table_brick_design_avg.py] 并列, 都是出 LaTeX 表的工具. 区别:
+  table_brick_design_avg.py  按 (scenario × system × metric) 出 cell
+                             即每行一个 system, 每列一个 metric, 每 cell
+                             是 mean ± std.
+  本文件                       按 (operator 类型 × system) 出 cell
+                             即 row = SEM_FILTER / SEM_JOIN / SEM_MAP /
+                             SEM_SCORE / SEM_CLASSIFY (5 种语义算子),
+                             column = system + (Quality/Latency,
+                             Quality/Money) 两组比值. 这张表回答:
+                             "哪个 system 在哪种算子上 cost-effective 最好"
+
+主体类 AggregateTableGenerator (~12 methods)
+--------------------------------------------
+  扫描 + 装载:
+    scan_available_data              扫 files/*/metrics/ 看有哪些
+                                     (scenario, system, model) 组合
+    load_data                        读所有 (scenario, system) 的 metrics JSON
+    _average_metrics_across_repeats  把多 round 数据平均成单 round
+  过滤:
+    filter_queries_by_support        只保留所有 system 都支持的 query
+                                     (only_common_queries=True 模式)
+    get_systems_supporting_operator  每个 operator 哪些 system 实现了
+  聚合统计:
+    extract_metrics                  从 query metric dict 抽 (cost, latency,
+                                     accuracy) 三元组
+    calculate_operator_aggregates    对每 operator 算 cross-query mean
+    calculate_efficiency_metrics     算 Q/L (quality/latency) + Q/M
+                                     (quality/money) ratio
+  count + 输出:
+    count_operator_queries           每 operator 的 query 数 (脚注用)
+    latex_float                      float → LaTeX sci notation
+    generate_latex_table             ★ 主出口, 输出完整 .tex 文件
+    print_summary                    调试用, 把表内容用 ASCII 打 stdout
+
+★ 关键概念: Quality / Latency 比 vs Quality / Money 比
+------------------------------------------------------
+benchmark 时光看 *quality* 不够 — 一个 system F1=0.99 但跑 1 小时 + $100
+不如 F1=0.95 跑 10 sec + $0.1. 这两个 ratio 让 user 直观看到 "每秒 quality"
+和 "每美元 quality".
+
+引用: [LOG_STRUCTURE.md §5.5 可视化与分析](../LOG_STRUCTURE.md)
+============================================================================
 """
 
 import json
@@ -20,6 +69,15 @@ from matplotlib import colors
 from natsort import natsorted
 
 
+# ============================================================================
+# AggregateTableGenerator — operator × system LaTeX 表生成
+# ============================================================================
+# 关键 flag:
+#   only_common_queries:    True → 只保留所有 system 都支持的 query
+#                                  (公平比较, 避免 LOTUS 漏跑 Q3 让平均虚高)
+#                           False → 所有 query 都算, 系统支持 query 数有差
+#   use_repeat_folders:     True → 读 metrics/round_{N}/{sys}.json 多 round
+#                           False → metrics/{sys}.json 单 round
 class AggregateTableGenerator:
     def __init__(self, base_path: str = "./files", only_common_queries: bool = True, use_repeat_folders: bool = False):
         self.base_path = Path(base_path)
@@ -513,6 +571,17 @@ class AggregateTableGenerator:
 
         return common_operators
 
+    # ========================================================================
+    # calculate_efficiency_metrics — 算 Quality/Latency + Quality/Money 比
+    # ========================================================================
+    # 对每 (operator, system) 算两个 ratio:
+    #   Q/L = mean_accuracy / mean_latency_sec   单位: "score per second"
+    #   Q/M = mean_accuracy / mean_money_usd     单位: "score per dollar"
+    # latency / money 都是 *越小越好*, 所以这俩 ratio 越大越好 — paper 表
+    # 里用 \cellcolor{green!深} 高亮大值, red 标小值.
+    #
+    # 边界: latency 或 money 为 0 (system 没收集到该指标) → set ratio 为 0
+    # 而不是 inf, 否则 LaTeX colormap normalization 会出错.
     def calculate_efficiency_metrics(self, operator_stats: Dict) -> Dict:
         """
         Calculate Quality/Latency and Quality/Money metrics.
@@ -587,6 +656,18 @@ class AggregateTableGenerator:
 
         return counts
 
+    # ========================================================================
+    # generate_latex_table — ★ 主出口, output 完整 .tex 文件
+    # ========================================================================
+    # 流程:
+    #   1. scan_available_data → 哪些 (scenario, system) 有数据
+    #   2. load_data → 读所有 metrics
+    #   3. filter_queries_by_support → 找 common query
+    #   4. calculate_operator_aggregates → operator × system 聚合
+    #   5. calculate_efficiency_metrics → Q/L + Q/M ratio
+    #   6. 用 colormap 把每 cell ratio 转 cellcolor; 用 latex_float 格式化
+    #      数值; 拼整张 \begin{tabular}...\end{tabular}.
+    #   7. 写到 output_filename.
     def generate_latex_table(self, model_tag="2.5flash", output_filename="aggregate_operator_table.tex"):
         """
         Generate LaTeX table with operator types as rows and systems with metrics as columns.
@@ -962,6 +1043,11 @@ class AggregateTableGenerator:
         print("\n" + "=" * 90 + "\n")
 
 
+# ============================================================================
+# main — 模块级入口
+# ============================================================================
+# 默认 only_common_queries=True + use_repeat_folders=True (论文 §6 配置).
+# 直接 python src/aggregate_table_generator.py 触发, 输出 .tex 到当前目录.
 def main(only_common_queries=True, use_repeat_folders=True):
     """Main function to generate aggregate operator table
 

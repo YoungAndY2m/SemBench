@@ -28,6 +28,67 @@
 
 > 最新在最上面（changelog 风格）。
 
+### [2026-05-20] 教学注释 pass 完整完成 — 15 个文件 (顶层 cross-cutting Python)
+
+- **目的**: 用户在 session 4 末决定将 SemBench 注释任务列为 #1 (覆盖之前 "必须先做 SQPE 才能 SemBench" 的 prereq), 对 SemBench 顶层 cross-cutting Python 工具做全面教学注释, 配合 [LOG_STRUCTURE.md](LOG_STRUCTURE.md) 让零基础工作者只读注释 + paper 就能扩展 / 改造 SemBench.
+- **范围 (用户 AskUserQuestion 选项 3 "全 cross-cutting Python")**: 15 文件, source LoC ~12,033, 注释 +1875 行 (含 file docstring 扩展 + class banner + method banner)
+- **修改文件 (全部按 [CLAUDE.md §5.5 §D 硬约束] 0 statement 修改 / 0 行号偏移 / 0 原 docstring 改动, 纯 byte-additive)**:
+
+  **P0 entry layer (2 files +271)**:
+  - [src/run.py](src/run.py) — 534 → 751 (+217) — argparse + dispatcher + isolated/direct mode 切换
+  - [src/run_worker.py](src/run_worker.py) — 93 → 147 (+54) — subprocess worker + stdout marker 协议
+
+  **P0 scenarios (6 files +495)**:
+  - [src/scenario/cars/cars_scenario.py](src/scenario/cars/cars_scenario.py) — 92 → 182 (+90) — ScenarioHandler 抽象基线 + cars 特殊性
+  - [src/scenario/medical/medical_scenario.py](src/scenario/medical/medical_scenario.py) — 97 → 151 (+54) — snowflake 系统集成
+  - [src/scenario/mmqa/mmqa_scenario.py](src/scenario/mmqa/mmqa_scenario.py) — 134 → 218 (+84) — MMQADataGenerator class + multi-modal
+  - [src/scenario/animals/animals_scenario.py](src/scenario/animals/animals_scenario.py) — 165 → 240 (+75) — adversarial data crafting (_ensure_*_pattern)
+  - [src/scenario/movie/movie_scenario.py](src/scenario/movie/movie_scenario.py) — 181 → 244 (+63) — review 文本清洗 + caesura 集成
+  - [src/scenario/ecomm/ecomm_scenario.py](src/scenario/ecomm/ecomm_scenario.py) — 200 → 329 (+129) — TOML-driven 声明式 query + DuckDB GT
+
+  **P1 base classes (2 files +572)**:
+  - [src/runner/generic_runner.py](src/runner/generic_runner.py) — 342 → 590 (+248) — GenericRunner ABC + GenericQueryMetric dataclass + template method pattern
+  - [src/evaluator/generic_evaluator.py](src/evaluator/generic_evaluator.py) — 711 → 1035 (+324) — GenericEvaluator ABC + 5 metric dataclass + retrieval/aggregation/ranking/clustering 4 大评估范式
+
+  **P1 visualization & analysis (5 files +537, compact 策略)**:
+  - [src/plot.py](src/plot.py) — 4608 → 4780 (+172) — BenchmarkPlotter 32 methods (file + class + 6 method banners)
+  - [src/table_brick_design_avg.py](src/table_brick_design_avg.py) — 1160 → 1247 (+87) — LaTeX heatmap table with ±σ
+  - [src/aggregate_table_generator.py](src/aggregate_table_generator.py) — 996 → 1082 (+86) — operator × system Q/L + Q/M ratio table
+  - [src/plot_scalability_combined.py](src/plot_scalability_combined.py) — 674 → 744 (+70) — GridSpec multi-cell scalability + memory figure
+  - [scripts/analysis.py](scripts/analysis.py) — 2046 → 2168 (+122) — SystemAnalyzer 30+ methods, tolerance-relaxed winner analysis
+
+- **风格规范** (按 [CLAUDE.md §5.5 §B](../CLAUDE.md)):
+  - 中英夹杂: 概念名 / API / 数学符号保留英文, 解释中文
+  - 禁 LaTeX (注释 IDE 渲染不了)
+  - 零基础读者目标: 每个 ML/DL/SQPE/统计学概念 (precision / recall / F1 / Spearman / ARI / Omega / pareto frontier / tolerance ε / @dataclass / ABC / template method / matplotlib GridSpec / TOML / DuckDB file_search_path) 第一次出现都给中文释义
+  - 大文件 (plot.py / analysis.py / 3 table 工具) 采 compact (file + class + 主要 method) 策略, 不逐方法详注; 中小文件 (run.py / generic_runner / generic_evaluator) 详注
+
+- **硬约束验证全部通过** (按 [CLAUDE.md §5.5 §D](../CLAUDE.md)):
+  - 所有 15 文件 `python3 -c "import ast; ast.parse(open('FILE').read())"` ✓
+  - 所有 15 文件 `git diff --unified=0 -- FILE | grep -E '^-[^-]'` 返回 **0 deletion** (纯 byte-additive, 无 statement / 缩进 / 行号 / 原 docstring 改动)
+  - 总 git stat: `15 files changed, 1875 insertions(+)`
+  - Edit 工具 trailing-whitespace pitfall 零事故 (vs CAESURA L1 注释 pass 7 文件中 5 文件中招)
+
+- **实战教训** (从 ANNOTATION_CHECKPOINT.md 实战教训段整理, 现归并到本 changelog):
+
+  1. **LOG_STRUCTURE.md 与实际 repo 小漂移**: scenario 实际是 6 个 (handoff 说 4 个); `run.py` / `plot.py` 在 `src/` 下; `src/result/` 实际是 `src/evaluator/`. 全部按实际位置注释.
+  2. **复杂度梯度**: 6 个 scenario 不是 copy-paste, 复杂度从 cars (最简) → medical → mmqa → animals → movie → ecomm (最 elaborate, TOML 声明式). 每个 scenario 按特殊点单独 surface.
+  3. **Surface (不修) 的 bugs**:
+     - `cars_scenario.py:17` docstring 写 "Medical scenario handler" (copy from medical).
+     - `mmqa_scenario.py:58` `FlockMTLMMQASetup` 缺括号.
+     - `mmqa_scenario.py` 大小写 q vs Q 不一致 (line 82 vs 124).
+     - `generic_evaluator.py:602` `raise "..."` (字符串不是 Exception, 真跑会 TypeError).
+     - `compute_*` 7 个 static helpers 都缺 @staticmethod 装饰.
+     - `compute_adjusted_rand_index` docstring 说 "group" 列但代码用 "category".
+  4. **Compact 策略适用边界**: 当一个 class 有 20+ method 且方法间结构高度同质 (e.g. plot.py 的各 plot_X / analysis.py 的各 calculate_X / find_winners_X), class-level banner 列出方法分组 + 3-5 个关键 method 详注 比逐方法详注更有教学价值 (减少噪音 + 强化整体 mental model). 关键: 必须在 class-level banner 里 *列全* method, 让读者能从一个位置 catalog 所有方法.
+  5. **Edit 工具 whitespace 陷阱无事故的原因**: 全程只用 "整段插入" 模式 (Edit 把 `<context>` 替换为 `<context> + <new banner content>`), 不做单行替换; 对 file docstring 严格用 "在原 docstring 内追加新段" 而非整段重写.
+
+- **配套文件状态**:
+  - [LOG.md](LOG.md) (本文件) — 追加本条 changelog
+  - [LOG_STRUCTURE.md](LOG_STRUCTURE.md) — 不动; 注释里多处引用其 §4.1 / §4.3 / §5.1 / §5.3 / §5.5 / §7.1 / §7.2 章节
+  - [LOG_EXEC.md](LOG_EXEC.md) — 不动 (本次纯文档, 没新增执行步骤)
+  - `ANNOTATION_CHECKPOINT.md` — 归档到本 changelog 后 `rm` 删除 (按 [CLAUDE.md §5.5 §H.4](../CLAUDE.md))
+
 ### [2026-05-18] 初次代码全面扫码 + LOG 三件套创建（仅文档，未改任何代码）
 
 - **目的**: 用户计划将 [Desktop/AreCELearnedYet/](../AreCELearnedYet/) 的 cardinality estimation 工作迁移到 semantic database 场景；本次只做 reconnaissance —— 在不动 upstream 代码的前提下，对 SemBench 全部 src/ + files/ + scripts/ + docs/ 做一次彻底通读，产出可供未来扩展的代码结构地图。

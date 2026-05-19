@@ -1,4 +1,73 @@
 #!/usr/bin/env python3
+"""
+============================================================================
+教学注释 pass (CLAUDE.md §5.5 全面注释) — scripts/analysis.py
+============================================================================
+
+本文件在 SemBench pipeline 里的位置
+------------------------------------
+跨 system / 跨 scenario 的 *高阶统计分析* 入口. 与 src/plot.py +
+src/table_brick_design_avg.py 区别:
+  plot.py / table:   出 figure / LaTeX 表给论文 §6 图表
+  本文件:            出 .csv / .md / .json 报告给论文 §6 *文字论述*
+                     (e.g. "LOTUS 在 sem_filter 上胜 5 个 scenario 中 4 个")
+
+主体类 SystemAnalyzer (~30 methods, 最复杂的工具)
+-------------------------------------------------
+按功能分组:
+
+1. **Setup / data 装载**
+   __init__ / set_tolerance_levels / scan_available_data / load_data /
+   extract_metrics
+   ※ tolerance_levels: 用于 "tolerance analysis" — 不严格找最优 system,
+     而是问 "在容忍 X% 偏差下哪些 system 算合格" — 体现工程权衡 (e.g.
+     1% 准确度的代价是否值 10x latency).
+
+2. **Upper bound (上限) 计算**
+   calculate_system_upper_bounds            每 system 实际跑了多少 query
+   calculate_operator_upper_bounds          每 operator 实际跑了多少
+   calculate_scenario_upper_bounds          每 scenario 实际跑了多少
+   ※ "上限" 因为不同 system 不支持所有 query, 各 system query 数不一.
+
+3. **Winner (赢家) 分析**
+   find_winners_by_scenario                 每 scenario 各 metric 谁第一
+   find_winners_across_scenarios            跨 scenario 平均后谁第一
+   find_winners_by_operator_type            每 operator 谁第一
+   find_winners_with_tolerance              带 tolerance 的"准 winner" 集
+   _is_winner_with_tolerance                helper 判定函数
+
+4. **统计 mean ± std 等**
+   calculate_system_statistics_across_scenarios
+   calculate_system_statistics_by_operator_type
+   calculate_system_statistics_by_scenario
+
+5. **Coverage (覆盖率) 分析**
+   calculate_system_coverage_across_scenarios
+   calculate_system_coverage_by_operator_type
+   calculate_system_coverage_by_scenario
+   ※ "coverage" = 该 system 在多少 query 上有数据. 没数据原因可能:
+     不支持 / setup 失败 / OOM / timeout.
+
+6. **Tolerance analysis (主输出)**
+   generate_tolerance_analysis          整体编排
+   run_tolerance_analysis               ★ 主出口
+   find_convergence_tolerance           找让所有 system 都算"赢" 的 ε
+   _save_convergence_results            落盘
+   _create_tolerance_plots              出 tolerance vs winner-count 曲线
+   _generate_tolerance_markdown         出 markdown 报告
+
+7. **可视化 / 落盘**
+   create_visualization_tables          出 cross-cutting 表
+   _save_results / _save_csv_tables /
+   _save_markdown_summary               多格式落盘
+
+输出位置
+--------
+analysis_results/{json|csv|md|png}/* 各种格式报告.
+
+引用: [LOG_STRUCTURE.md §5.5 可视化与分析](../LOG_STRUCTURE.md)
+============================================================================
+"""
 
 import json
 import os
@@ -10,6 +79,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
+# ============================================================================
+# SystemAnalyzer — 高阶分析入口类 (~30 methods)
+# ============================================================================
+# 关键概念: tolerance_levels
+# ----------------------------
+# tolerance_levels 是一个 ∈ [0, 1] 的 float list (e.g. [0, 0.01, 0.05, 0.1,
+# 0.2]). 对每个 ε:
+#   - 找最好 system 的 metric 值 best_v
+#   - 任何 system 满足 |system_v - best_v| / best_v ≤ ε 都算 "tolerance ε 下
+#     的 winner"
+# 用途: 论文 §6 想说 "在 5% 容忍下 LOTUS 和 Palimpzest 都可选" 而不是
+# 严格 "LOTUS 唯一胜出 by 0.001". 工程上 5% 偏差 user 看不出来, 但价格 /
+# 速度差异显著, 这个 tolerance 视角让 paper 更有 actionable insight.
 class SystemAnalyzer:
     def __init__(self, base_path: str = "./files", output_dir: str = "./analysis_results", tolerance_levels: List[float] = None):
         self.base_path = Path(base_path)
@@ -377,6 +459,14 @@ class SystemAnalyzer:
         
         return execution_time, money_cost, quality
     
+    # ========================================================================
+    # find_winners_by_scenario — 每 scenario 各 metric 哪个 system 第一
+    # ========================================================================
+    # 返回嵌套 dict {scenario: {metric: {system: best_value}}}.
+    # "best" 因 metric 而异: latency / cost 是 min; accuracy / F1 是 max.
+    # 实现里通常用 sorted() + 取 [0] 或 numpy.argmin / argmax.
+    #
+    # 输出用 markdown 报告里用作 "Per-Scenario Winners" 段.
     def find_winners_by_scenario(self) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
         Find winners for each scenario for each metric.
@@ -789,6 +879,16 @@ class SystemAnalyzer:
         
         return scenario_coverage
     
+    # ========================================================================
+    # find_winners_with_tolerance — ★ tolerance-relaxed winner set
+    # ========================================================================
+    # 返回 {scenario: {tolerance: {system: relaxed_best_value}}}.
+    # 对每个 ε ∈ tolerance_levels:
+    #   1. 算 best_v.
+    #   2. 任何 system 满足 _is_winner_with_tolerance(v, best_v, ε) 的都
+    #      纳入 winner set.
+    # 这个数据后续给 _create_tolerance_plots 出曲线 "winner count vs ε",
+    # 让论文 § 6 能说 "ε=0.05 时 3 个 system 都合格".
     def find_winners_with_tolerance(self, tolerance_levels) -> Dict[str, Dict[float, Dict[str, float]]]:
         """
         Find winners across all scenarios with different tolerance levels.
@@ -996,6 +1096,20 @@ class SystemAnalyzer:
         
         print("Tolerance analysis complete!")
     
+    # ========================================================================
+    # run_tolerance_analysis — ★ tolerance pipeline 主出口
+    # ========================================================================
+    # 步骤:
+    #   1. 调 find_convergence_tolerance 找让所有 system 都成 winner 的 ε.
+    #   2. 调 generate_tolerance_analysis 跑一整套 tolerance sweep.
+    #   3. _create_tolerance_plots 出 figure.
+    #   4. _generate_tolerance_markdown 写报告.
+    #
+    # convergence_criterion 选项:
+    #   "first_system"  — ε 增大过程中第一个 winner-count > 1 的点
+    #   "all_systems"   — ε 让所有 system 都成 winner 的最小 ε
+    # 不同 criterion 对应不同 paper 论点 ("LOTUS 唯一胜出" vs "ε=5% 时大家
+    # 都达标").
     def run_tolerance_analysis(self, convergence_criterion: str = "first_system", max_points_per_metric: Dict[str, int] = None, output_suffix: str = ""):
         """
         Run tolerance analysis with configurable stopping criteria and point density control.
@@ -1964,6 +2078,14 @@ class SystemAnalyzer:
         with open(self.output_dir / "analysis_summary.md", 'w') as f:
             f.write("\n".join(md_lines))
 
+# ============================================================================
+# main — 模块级入口, `python scripts/analysis.py` 触发
+# ============================================================================
+# 通常 main() 内部:
+#   1. 实例化 SystemAnalyzer(base_path=..., tolerance_levels=...).
+#   2. 调 run_tolerance_analysis + create_visualization_tables.
+#   3. 输出全部落到 analysis_results/.
+# 论文 build 流水线在 scripts/repeat_experiment.sh 之后调本脚本.
 def main():
     """Main analysis function"""
     print("Starting system performance analysis...")

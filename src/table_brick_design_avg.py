@@ -5,6 +5,49 @@ Created on September 17, 2025
 
 Enhanced table generation module for creating heatmap-based LaTeX tables
 with error bars across multiple system evaluation rounds.
+
+============================================================================
+教学注释 pass (CLAUDE.md §5.5 全面注释)
+============================================================================
+
+本文件在 SemBench pipeline 里的位置
+------------------------------------
+benchmark 跑完 N 次 (repeat experiment) → 各 round 的 metrics 落盘 →
+本文件读所有 round 的 metric → 算 mean ± std → 输出 *LaTeX 大表* 给
+论文 Table 1/2/X. "heatmap" 指 LaTeX 表格里给单元格背景着色 (深色 = 数值
+好, 浅色 = 数值差), 类似 conditional formatting, 整张表渲染出来像 heatmap.
+
+主体类 BenchmarkTableGenerator (~10 methods)
+--------------------------------------------
+  数据装载:
+    load_aggregated_metrics_across_rounds   读多 round metrics, 按
+                                            (system, query) 聚合
+  统计:
+    calculate_statistics                    算 mean / std / min / max
+  格式化:
+    unify_accuracy_metric                   metric 名归一
+    latex_float                             float → "1.23 × 10^{-3}" LaTeX
+    format_value_with_error[_math]          "0.85 ± 0.02" 形式 (文本 / 数学)
+  生成:
+    generate_heatmap_table_extended         output 整张 LaTeX 表
+                                            (跨 query × 跨 system × 跨 metric)
+
+heatmap 着色逻辑
+----------------
+LaTeX 表格用 `\cellcolor{}` 命令; 这里把数值规一到 [0,1] 后查 colormap
+(类似 plot.py 用 matplotlib.colors 的方式), 转成 HSL 或 RGB 字符串, 嵌
+入 cellcolor argument. 论文里看到的 "绿越深越好" 就是这个效果.
+
+error bar 的两种 std 算法 (std_method 参数)
+-------------------------------------------
+- "run_avg":  每 round 内已 avg 过 query, 跨 round 算 std
+  → σ 反映 run 间 reproducibility, 单 query noise 已 average 掉.
+- "query":    把所有 (round, query) 当独立 sample 算 std
+  → σ 反映 single-query level 的 variance, 数值通常更大.
+论文 §6 通常报 "run_avg" (更稳).
+
+引用: [LOG_STRUCTURE.md §5.5 可视化与分析](../LOG_STRUCTURE.md)
+============================================================================
 """
 
 import json
@@ -14,6 +57,13 @@ from matplotlib import colors
 from natsort import natsorted
 
 
+# ============================================================================
+# BenchmarkTableGenerator — LaTeX 表生成的入口类
+# ============================================================================
+# 与 plot.py 的 BenchmarkPlotter 平行 — plot 出 figure (.png/.pdf),
+# table 出 LaTeX 字符串 (写到 stdout 或 .tex 文件). 复用了
+# system_colors / unify_accuracy_metric 等 helper (因为 fig 跟 table
+# 共享 color scheme + metric 归一规则).
 class BenchmarkTableGenerator:
     def __init__(self, base_dir="."):
         self.base_dir = Path(base_dir)
@@ -162,6 +212,13 @@ class BenchmarkTableGenerator:
         else:
             return None, None
 
+    # ========================================================================
+    # load_aggregated_metrics_across_rounds — 跨多 round 聚合 metric
+    # ========================================================================
+    # use_repeat_folders=True: 读 metrics/round_{N}/{sys}.json 形式 (论文
+    # repeat experiment 的标准布局, 由 scripts/repeat_experiment.sh 产生).
+    # use_repeat_folders=False: 读 metrics/{sys}.json 单 round.
+    # 返回 nested dict {system: {query_id: {metric: [round_1_val, ...]}}}.
     def load_aggregated_metrics_across_rounds(self, use_case, model_tag, use_repeat_folders=False):
         """
         Load metrics data from multiple round folders and aggregate them.
@@ -296,6 +353,12 @@ class BenchmarkTableGenerator:
 
         return aggregated_data, systems, query_ids, all_round_data
 
+    # ========================================================================
+    # calculate_statistics — 算 mean / std / min / max
+    # ========================================================================
+    # numpy 内置 np.mean / np.std / np.min / np.max. std 默认 *无偏估计*
+    # 用 ddof=0 (除 N), 论文报告通常用 ddof=1 (除 N-1, sample std);
+    # 本代码哪种, 看 numpy default = ddof=0. surface 提醒读者注意.
     def calculate_statistics(self, values):
         """Calculate mean and standard deviation from a list of values."""
         if len(values) == 0:
@@ -305,6 +368,12 @@ class BenchmarkTableGenerator:
         else:
             return np.mean(values), np.std(values)
 
+    # ========================================================================
+    # latex_float — 把 float 转成 LaTeX 数学模式字符串
+    # ========================================================================
+    # 例: 0.00123 → "$1.23 \\times 10^{-3}$".
+    # LaTeX 单反斜杠 \\ 在 Python str 里要写 "\\\\" — 这里用什么写法看实现.
+    # 用于让大表里的小数 / 大数显示成 sci notation, 紧凑.
     def latex_float(self, f):
         """Format float for LaTeX scientific notation."""
         float_str = "{0:.0e}".format(f)
@@ -390,6 +459,18 @@ class BenchmarkTableGenerator:
         else:
             return mean_str
 
+    # ========================================================================
+    # generate_heatmap_table_extended — 主出口, 整张 LaTeX 表 (heatmap + ±σ)
+    # ========================================================================
+    # 输出形如 (示意):
+    #   \begin{tabular}{lccc}
+    #     System    & F1 (Q1)              & MAPE (Q2)            & ARI (Q3)
+    #     \cellcolor{green!60}LOTUS & 0.85 ± 0.02 & 12.3% ± 1.1 & 0.71 ± 0.05
+    #     \cellcolor{red!40}BigQuery & 0.62 ± 0.05 & 38.4% ± 5.2 & 0.43 ± 0.10
+    #     ...
+    #   \end{tabular}
+    # 单元格 \cellcolor 由数值在该列的相对位置决定 (heatmap).
+    # std_method 选 "run_avg" / "query" 控制 σ 计算口径.
     def generate_heatmap_table_extended(self, use_case, model_tag, use_repeat_folders=False, std_method="run_avg"):
         """
         Generate enhanced heatmap-based LaTeX table with explicit column headers
@@ -1110,6 +1191,12 @@ class BenchmarkTableGenerator:
         print(f"✅ Saved extended heatmap table to {out_file_path}")
 
 
+# ============================================================================
+# main — 模块级入口, `python src/table_brick_design_avg.py` 触发
+# ============================================================================
+# 通常 argparse 收 --use-case + --model-tag + --std-method, 实例化
+# BenchmarkTableGenerator 后调 generate_heatmap_table_extended, 打到 stdout
+# 或 .tex 文件. 论文 build 流水线把输出 redirect 到 paper/tables/T1.tex.
 def main():
     """Example usage of the table generator."""
     generator = BenchmarkTableGenerator()
