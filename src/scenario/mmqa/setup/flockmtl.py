@@ -1,3 +1,27 @@
+"""
+============================================================================
+SemBench L1 wrapper — mmqa/setup/flockmtl.py
+============================================================================
+教学注释 pass (L1 ADD) by Claude.
+
+与 [movie/setup/flockmtl.py] 同结构, 4 个表 (vs movie 2):
+  - ben_piazza: 演员事实表
+  - ben_piazza_text_data / lizzy_caplan_text_data: 演员相关 wiki 文本表
+  - tampa_international_airport: 不相关 (用来测 SQL 多表 JOIN)
+
+默认 model_name 改 "gpt-5-mini" (vs movie 默认 gpt-4o-mini) — 但 gpt-5 系列实际不存在/未上线;
+看起来是 dev 时占位 (LOG.md "遗留问题": mmqa 整 scenario 跑不通).
+
+⚠ mmqa scenario 整体 broken:
+  - 本 setup: ✓ OK (能创建 conn + load 表)
+  - runner [mmqa/runner/flockmtl_runner/flockmtl_runner.py]: ❌ broken
+    - import 路径错 `from src.scenario...` (应该 `from scenario...`)
+    - 所有 16 个 _execute_q* 方法是 commented-out dead code
+  - 缺 SQL 模板: files/mmqa/query/flockmtl/ 整个目录不存在
+  → 即使 setup 跑通, runner 没法 dispatch 到任何 query
+============================================================================
+"""
+
 import os
 from pathlib import Path
 
@@ -9,6 +33,7 @@ MMQA_FILES_DIR = os.path.abspath(
 
 
 class FlockMTLMMQASetup:
+    # ⚠ 默认 model="gpt-5-mini" — 不存在的模型, 实际跑会 LLM API 报 model_not_found
     def __init__(self, model_name: str = "gpt-5-mini"):
         """
         Initializes the FlockMTL connection using environment variables.

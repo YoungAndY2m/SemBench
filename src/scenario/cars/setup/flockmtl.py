@@ -1,4 +1,20 @@
 
+"""
+============================================================================
+SemBench L1 wrapper — cars/setup/flockmtl.py
+============================================================================
+教学注释 pass (L1 ADD) by Claude.
+
+与 [medical/setup/flockmtl.py] 模板复制 — 4 个表:
+  cars / car_audio / car_complaints / car_images
+  (汽车数据 + 音频 + 文本 + 图像 4 模态)
+
+⚠ **scenario 整体 broken** (LOG.md 已记录):
+  - 本 setup: ✓ 存在
+  - runner: ❌ src/scenario/cars/runner/flockmtl_runner/ 目录不存在
+  → run.py 调 `get_runner_class("flockmtl", "cars")` 立即 ImportError
+============================================================================
+"""
 
 import os
 from pathlib import Path

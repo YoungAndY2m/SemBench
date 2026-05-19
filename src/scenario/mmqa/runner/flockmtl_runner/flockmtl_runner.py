@@ -1,7 +1,33 @@
 """
 FlockMTL system runner implementation for MMQA scenario.
+
+============================================================================
+SemBench L1 wrapper — mmqa/runner/flockmtl_runner/flockmtl_runner.py
+============================================================================
+教学注释 pass (L1 ADD) by Claude.
+
+❌ **整文件 broken** — 不可用. 详 LOG.md "遗留问题":
+
+1. **import 路径错** (line 5-7):
+   `from src.scenario.mmqa.setup.flockmtl import FlockMTLMMQASetup`
+                ↑↑↑↑↑↑
+   应该是 `from scenario.mmqa.setup.flockmtl import FlockMTLMMQASetup` (无 src. 前缀).
+   SemBench 把 src/ 加进 PYTHONPATH; from src.* 找不到 → ModuleNotFoundError.
+
+2. **所有 16 个 `_execute_q*` 方法是 commented-out dead code** (line 43-531):
+   作者写了 Python 函数体 *用 # 注释* 而非函数定义; 没法被 reflection 找到.
+   即使修了 import 也跑不出任何 query.
+
+3. **缺 SQL 模板**: files/mmqa/query/flockmtl/ 整个目录不存在.
+
+实际后果: SemBench 调 `python run.py --systems flockmtl --use-cases mmqa` 立即 import 失败.
+本文件 532 行中 *仅 42 行实际生效* (line 1-42), 后面 490 行是 commented Python 代码.
+
+只注释 __init__ 部分; 后面 dead comment block 不展开 (代码量太大且永不执行).
+============================================================================
 """
 
+# ⚠ import 路径错: `src.scenario` 应该是 `scenario` (src/ 是 PYTHONPATH root, 不在 path 前缀)
 from src.scenario.mmqa.setup.flockmtl import FlockMTLMMQASetup
 from src.runner.generic_flockmtl_runner.generic_flockmtl_runner import (
     GenericFlockMTLRunner,
