@@ -2,6 +2,27 @@
 Lotus system runner implementation.
 """
 
+# ============================================================
+# 教学注释 (L1 wrapper pass):
+# ------------------------------------------------------------
+# Medical scenario 的 Code* mode wrapper. 与 cars 类似但有 2 个关键差异:
+#
+#   1) 用 scenario_handler.get_query_text + types.ModuleType + exec() 加载
+#      query, 而非 importlib (line 47-51). 这是 SemBench 早期的 Code* 加载
+#      方式, scenario_handler 抽象层管文件路径; cars 用更现代的 importlib
+#      directly. 两种实现混存, 是历史包袱.
+#
+#   2) override execute_query (line 35-80) 而非靠 GenericLotusRunner 的
+#      默认. 与父类几乎一样但 raise 替代 silent error (line 71) —
+#      medical 实验更 strict: query 失败要立即停, 不允许吞 error.
+#
+# 默认 model gemini-2.5-pro 而非 gemini-2.5-flash (line 23) — medical
+# query 需要更深推理, paper §7 实验默认 pro.
+#
+# 与 cars 共有 _execute_q<i> stub: 通过父类 GenericRunner._discover_queries
+# (line 31-33) 而非 GenericLotusRunner 的 regex 发现 (因为 medical 没显式
+# 写 _execute_q method, query 都从 scenario_handler 动态拿).
+# ============================================================
 from pathlib import Path
 import sys
 import time
@@ -32,6 +53,23 @@ class LotusRunner(GenericLotusRunner):
         # Match default implementation from GenericRunner
         return GenericRunner._discover_queries(self)
 
+    # ========================================================
+    # execute_query: 覆盖父类, 用 exec() 加载 query
+    # --------------------------------------------------------
+    # 加载流程 (line 47-54):
+    #   1) scenario_handler.get_query_text(qid, "lotus") → str (Q<i>.py 全文)
+    #   2) types.ModuleType("Q<i>_module") → 创建空 module 对象
+    #   3) exec(query_text, module.__dict__) → 执行 Q<i>.py 全文, 把 def 注入
+    #      到 module 命名空间
+    #   4) module.run(data_dir, scale_factor) → 调 Q<i>.py 内的 run() 函数
+    #
+    # ⚠ exec() 是动态代码执行, 有 security 风险 (但 SemBench query 是
+    # repository 自己的可信代码, 不接受 user input, OK).
+    #
+    # 与 cars 的 importlib 路径相比:
+    #   - exec() 更轻 (无 spec/module_from_spec/loader 三件套)
+    #   - 但 query 内的 import / __name__ 等 dunder 行为略不同
+    # ========================================================
     def execute_query(self, query_id: int) -> GenericQueryMetric:
         metric = GenericQueryMetric(query_id=query_id, status="pending")
 

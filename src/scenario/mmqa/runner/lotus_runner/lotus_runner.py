@@ -1,3 +1,41 @@
+"""
+============================================================
+LOTUS MMQA L1 wrapper (教学注释 pass)
+============================================================
+
+MMQA = Multi-Modal Question Answering scenario. 一个大型 multimodal 数据
+集 (image + text question answering), 18 个 sub-query (Q1 / Q2a / Q2b /
+Q3a-g / Q4 / Q5 / Q6a-c / Q7), 是 SemBench 最复杂的 scenario.
+
+------------------------------------------------------------
+Code mode (inline _execute_q*):
+------------------------------------------------------------
+MMQA 用 Code mode 而非 Code* — 每个 query 是 LotusRunner 的方法. 因为
+MMQA query 之间共享很多 setup (load_data + ImageArray wrap + cascade
+config), inline 减少重复代码.
+
+------------------------------------------------------------
+sub-query 命名 (Q1 / Q2a / Q2b / Q3a-g / ...):
+------------------------------------------------------------
+MMQA paper 的 query 不是简单数字, 而是按主题分组:
+  - Q1 : single text question
+  - Q2a / Q2b : two variants of multi-image join
+  - Q3a-g : 7 个 image filter variants (不同 filter complexity)
+  - Q4 : image + table join
+  - Q5 : aggregation over images
+  - Q6a-c : 3 个 multi-modal QA variants
+  - Q7 : end-to-end pipeline
+✗ paper 没说怎么把这些命名 map 到统一 ID, SemBench 自己 sort 排好.
+
+------------------------------------------------------------
+Cascade + Modality 配置 (与 ecomm 同模式):
+------------------------------------------------------------
+__init__ 在 policy="approximate" 时 instantiate 双 RM (text e5-base-v2 +
+image clip-ViT-B-32) + FaissVS + CascadeArgs.
+_configure_lotus_for_join_type 让 query 内代码动态切换 RM (text / image /
+mixed).
+============================================================
+"""
 import os
 
 import pandas as pd
@@ -9,6 +47,7 @@ from src.runner.generic_lotus_runner.generic_lotus_runner import (
 )
 
 # Import additional modules for approximate policy
+# ↑ 与 ecomm/movie 同模式
 from lotus.models import SentenceTransformersRM
 from lotus.types import CascadeArgs
 from lotus.vector_store import FaissVS
@@ -68,6 +107,26 @@ class LotusRunner(GenericLotusRunner):
                     lm=self.lm, rm=self.rm_image, vs=self.vs
                 )
 
+    # ========================================================
+    # _execute_qX methods (18 queries)
+    # --------------------------------------------------------
+    # 所有 query 共同模式:
+    #   1) load_data(csv 文件名) → df
+    #   2) ImageArray 包路径列 (如果是 image query)
+    #   3) sem_filter / sem_join / sem_map / 其它 sem op 链式调用
+    #   4) 返 pd.DataFrame
+    #
+    # query 之间设计差异:
+    #   - Q1 : 单 sem_filter + count, 基线 baseline
+    #   - Q2a/Q2b : sem_join 跨 image / image, modality-aware
+    #     (q2a text-image vs q2b image-image)
+    #   - Q3a-g : sem_filter 7 个 query 各自不同 prompt complexity, 测
+    #     prompt sensitivity
+    #   - Q4 : multi-step (image filter → text join), 测 LLM 跨模态推理
+    #   - Q5 : aggregation (sem_agg) 测长 context
+    #   - Q6a-c : end-to-end QA pipeline 3 variant
+    #   - Q7 : final end-to-end test
+    # ========================================================
     def _execute_q1(self) -> pd.DataFrame:
         """
         Execute q1.

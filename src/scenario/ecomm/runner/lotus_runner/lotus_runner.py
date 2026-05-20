@@ -3,6 +3,34 @@ Lotus system runner implementation.
 Placeholder required by the current structure of the benchmarking framework.
 """
 
+# ============================================================
+# 教学注释 (L1 wrapper pass):
+# ------------------------------------------------------------
+# E-commerce scenario 的 Code* mode wrapper. 比 cars / medical 复杂得多:
+#
+#   1) Cascade wiring (line 37-45) : 如果 policy="approximate", 实例化
+#      SentenceTransformersRM (text + image 双 RM) + FaissVS + CascadeArgs.
+#      paper §3 cascade 的实际启用入口.
+#
+#   2) Modality-aware join wiring (_configure_lotus_for_join_type, line 47-62) :
+#      根据 join_type ("text" / "image" / "mixed") 切换 RM 用哪种 embedding.
+#      - text only → e5-base-v2 (纯文本 768-d)
+#      - image / mixed → clip-ViT-B-32 (能 encode 图也能 encode 文)
+#      query 文件内通过 _configure_lotus(join_type) 调用.
+#
+#   3) Helper injection (line 86-89) : exec() 之前在 query_module 命名空间
+#      注入 _configure_lotus / _cascade_args / _policy. 让 Q<i>.py 内代码
+#      可以直接调 _configure_lotus("image") 等. 这是 SemBench 给 Code* mode
+#      query 暴露 cascade 设置的机制 — 否则 query 文件没法访问 runner instance.
+#
+# 默认 model "vertex_ai/gemini-2.5-flash" (line 29) — 注意 LiteLLM provider
+# prefix "vertex_ai/" 不能省 ([LOTUS/LOG.md pitfall #6]).
+#
+# 路径不一致警告 ([LOTUS/LOG.md 关键发现 #8]):
+#   ecomm 用 files/ecomm/queries/dialects/lotus/q{i}.py (queries + dialects
+#   多两层); 其它 scenario 用 files/{sc}/query/lotus/Q{i}.py. scenario_handler
+#   内部处理这个差异.
+# ============================================================
 from pathlib import Path
 import sys
 import time
@@ -16,6 +44,9 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 from runner.generic_lotus_runner.generic_lotus_runner import GenericLotusRunner
 
 # Import additional modules for approximate policy
+# SentenceTransformersRM : 给 cascade helper 当 proxy (cosine sim 当 proxy_score)
+# CascadeArgs : 阈值参数 (paper §3, 详 [AllSQPE/LOTUS/types.py:163])
+# FaissVS : 默认 local vector store
 from lotus.models import SentenceTransformersRM
 from lotus.types import CascadeArgs
 from lotus.vector_store import FaissVS
@@ -44,6 +75,22 @@ class LotusRunner(GenericLotusRunner):
                 recall_target=0.8, precision_target=0.8
             )
 
+    # ========================================================
+    # _configure_lotus_for_join_type: per-query modality switch
+    # --------------------------------------------------------
+    # ecomm 的 query 涉及不同模态 join:
+    #   - Q1-Q5 主要 text-text (product description vs review)
+    #   - Q6-Q10 含 image (product image vs query)
+    #   - Q11-Q14 mixed (text + image)
+    # 不同模态需要不同 RM:
+    #   - text RM (e5-base-v2) : 处理纯文本 sim, 不识别图
+    #   - image RM (clip-ViT-B-32) : 能 cross-modal (text 与 image cosine sim)
+    # 这里给 query 内代码暴露切换接口, query 在 cascade 之前调
+    #   _configure_lotus("image") 或类似, settings.rm 就被换.
+    #
+    # 注: 此函数 lazy 切换 — 不 sem_search 时不切; sem_search 之前必须调.
+    # 否则 settings.rm 留着上次的, query 跑出错或精度低.
+    # ========================================================
     def _configure_lotus_for_join_type(self, join_type: str):
         """Configure LOTUS settings based on join type (text-only, image-only, or mixed)."""
         if hasattr(self, "policy") and self.policy == "approximate":

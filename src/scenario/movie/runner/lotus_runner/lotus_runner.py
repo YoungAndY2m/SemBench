@@ -6,6 +6,29 @@ Created on May 28, 2025
 LOTUS system runner implementation based on generic_lotus_runner for movie use case.
 """
 
+# ============================================================
+# 教学注释 (L1 wrapper pass) — 最大 L1 文件
+# ------------------------------------------------------------
+# Movie scenario 的 Code mode wrapper. SemBench 中 LOTUS 接入 paper §7
+# 实验最完整的 scenario, Q1-Q10 全部实现. 597 LoC 是 LOTUS L1 最大文件.
+#
+# Movie scenario 全 text-only (movie review sentiment / similarity), 不
+# 涉及 image / audio. 所以 cascade wiring 只 wire text RM (e5-base-v2),
+# 不像 ecomm / mmqa 双 RM (text + image).
+#
+# 10 个 query 主题:
+#   - Q1 : "find clearly positive reviews" — 简单 sem_filter
+#   - Q2-Q5 : 各种 sem_filter / sem_map 组合
+#   - Q6-Q8 : sem_join (text-text review similarity)
+#   - Q9 : sem_topk ranking
+#   - Q10 : end-to-end pipeline
+#
+# Cascade 启用 (line 56-61): policy="approximate" 时 wire RM + VS +
+# CascadeArgs. Q6-Q8 sem_join 会真正用到; 其它 query 没启用 cascade.
+#
+# 注意: paper §7 movie 实验默认 policy="approximate" + gemini-2.5-flash,
+# 这里 default 也是 (line 36).
+# ============================================================
 import pandas as pd
 import time
 from typing import Dict, Any, List
@@ -21,6 +44,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 from runner.generic_lotus_runner.generic_lotus_runner import GenericLotusRunner
 
 # Import additional modules for approximate policy
+# ↑ 同 ecomm / mmqa, 但只 wire text RM (movie 不涉及 image)
 from lotus.models import SentenceTransformersRM
 from lotus.types import CascadeArgs
 from lotus.vector_store import FaissVS
@@ -60,6 +84,13 @@ class LotusRunner(GenericLotusRunner):
                 recall_target=0.8, precision_target=0.8
             )
 
+    # ========================================================
+    # _configure_lotus_for_join_type
+    # --------------------------------------------------------
+    # Movie 只支持 "text" join_type (paper §7 movie 实验默认). 这里函数
+    # 留着是为对齐 ecomm / mmqa 的 modality switch 接口, 但实际只一条 if
+    # 分支生效. 给 query 内代码调 _configure_lotus("text") 用.
+    # ========================================================
     def _configure_lotus_for_join_type(self, join_type: str):
         """Configure LOTUS settings based on join type (text-only for movie sentiment comparisons)."""
         if hasattr(self, "policy") and self.policy == "approximate":
@@ -68,6 +99,23 @@ class LotusRunner(GenericLotusRunner):
                     lm=self.lm, rm=self.rm_text, vs=self.vs
                 )
 
+    # ========================================================
+    # _execute_qX methods (Q1-Q10, 10 queries)
+    # --------------------------------------------------------
+    # 类型分组:
+    #   Q1-Q5 : sem_filter / sem_map (single-table, no join)
+    #   Q6-Q8 : sem_join (review-review text 相似度 + cascade)
+    #   Q9    : sem_topk ranking (NL-based sort)
+    #   Q10   : end-to-end pipeline (filter → join → agg)
+    #
+    # 共同模式:
+    #   1) load_data("Reviews.csv" 等)
+    #   2) (可选) _configure_lotus("text") wire cascade
+    #   3) sem_X 链式调用
+    #   4) 返 pd.DataFrame
+    #
+    # ⚠ paper §7 movie 实验数字依赖此处实现 — 修改任一 query 会破坏复现.
+    # ========================================================
     def _execute_q1(self) -> pd.DataFrame:
         """
         Execute Q1: Find clearly positive movie reviews.
