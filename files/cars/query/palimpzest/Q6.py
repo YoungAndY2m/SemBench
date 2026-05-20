@@ -1,3 +1,16 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q6 (3-modal filter union)
+============================================================================
+
+cars Q6: 找出 (audio 显示损坏 OR image 显示损坏 OR 文字 complaint 提到车着火) 的车.
+Pipeline: 分 3 个 Dataset 各跑 sem_filter (audio / image / text), 再 union → distinct.
+特点: 3 个 modal 各跑一个 filter, 然后合并. cars query_id=6 是 audio query
+([2,5,6,7,9]).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import numpy as np
 import pandas as pd

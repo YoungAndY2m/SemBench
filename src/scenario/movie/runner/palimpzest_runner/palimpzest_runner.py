@@ -2,6 +2,34 @@
 Created on July 29
 
 Palimpzest system runner implementation.
+
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 ADD: movie Palimpzest wrapper
+============================================================================
+
+movie wrapper: Code mode (不是 Code\*!) — 393 LoC, 把 Q1-Q10 *inline*
+实现在 wrapper 里, 不读外部 query file.
+
+差异 vs cars/medical/ecomm (Code\* mode):
+- Code mode 把 query 直接写在 wrapper 里 (e.g. `def q1(self)` 方法)
+- Code\* mode 让 query 是独立 .py 文件, wrapper exec() 加载
+- 优劣: Code mode 改 query 要改 wrapper (重 deploy); Code\* mode 加新
+  query 只 drop .py 文件 (轻).
+
+movie scenario 是 SemBench paper Figure 1 的 motivation example (PDF
++ image + scrap reviews + box office 多源 join), 主打 multi-modal.
+
+Q1-Q10 各调用 Palimpzest fluent API:
+    dataset = pz.MemoryDataset(...).sem_filter(...)
+    if Q wants topk: dataset = dataset.top_k(...)
+    if Q wants extract: dataset = dataset.convert(schema=...)
+    results = dataset.run(self.palimpzest_config())
+
+Pydantic schema 定义经常出现 (e.g. class MovieReviewSchema(BaseModel):
+title: str; rating: int; ...). Palimpzest 用 Pydantic field 自动 prompt
+ChatGPT "抽这些字段".
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
 """
 
 import pandas as pd

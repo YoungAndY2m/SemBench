@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* ecomm q4 (image sem_add_columns)
+============================================================================
+
+ecomm q4: 同 q3 模式但走 image — `sem_add_columns` 给每个 product
+based on image 抽 category. Image-modal classification.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

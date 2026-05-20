@@ -1,3 +1,16 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q10 (sem_map classification)
+============================================================================
+
+cars Q10: 把每个 complaint 分类到 24 个 problem_category 之一 (LLM 分类任务).
+Pipeline: scan + join → sem_map (LLM 看 summary → 输出 problem_category) → project.
+特点: 用 sem_map (convert) 而非 sem_filter. cols=[{...}] 指定输出新字段
++ 自然语言 classification 指令. desc 中列出 24 个候选类别让 LLM 闭集选择.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

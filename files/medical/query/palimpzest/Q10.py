@@ -1,3 +1,15 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* medical Q10 (sem_map diagnosis)
+============================================================================
+
+medical Q10: 用 sem_map (LLM 看 symptoms → 输出 text_diagnosis 字段),
+返 (patient_id, text_diagnosis) 表. 与 cars/Q10 同模式 (sem_map 分类),
+但 medical Q10 输出 *自由文本* 诊断而非闭集类别.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

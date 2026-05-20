@@ -1,3 +1,15 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* ecomm q7 (sem_join)
+============================================================================
+
+ecomm q7: 用 `.sem_join(...)` LLM-based 语义连接两个 styles_details 表
+(可能 self-join). LLM 看 left/right 对判断是否 match (paper §3 sem_join).
+默认 implementation: NestedLoopsJoin (LLM call 每对 record).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

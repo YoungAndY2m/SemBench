@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* ecomm q5 (text sem_add_columns / classification)
+============================================================================
+
+ecomm q5: 同 q3 模式 — text-modal `sem_add_columns` 抽产品 category.
+不同 q3 的 brand name 任务, q5 抽其它属性 (具体看 desc).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

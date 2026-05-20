@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* medical Q4 (skin acne text filter)
+============================================================================
+
+medical Q4: scan + join → sem_filter text symptoms (LLM 判 skin acne) →
+project age. Similar to Q1 但 join 进 patient demographics.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

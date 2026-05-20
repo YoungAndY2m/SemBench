@@ -1,5 +1,25 @@
 """
 Palimpzest system runner implementation.
+
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 ADD: medical Palimpzest wrapper
+============================================================================
+
+medical wrapper: Code\* mode, 135 LoC. 结构类似 cars (复制 + 改 magic
+numbers), 处理 medical/Q{1..10}.py 10 个完整 Code\* query.
+
+差异 vs cars:
+- scale_factor=11112 (medical 默认数据集行数)
+- 没有 audio query (medical scenario 纯 text). cars 的 is_audio 路径
+  在这里完全不走.
+- 但仍 *复制了* cars 的硬编码 MaxQuality 逻辑 — 同样的 bug 在 medical
+  里"无害" (因为没 audio 分支), 但仍违反 config JSON 路由.
+
+Pattern: Q{1..10}.py 文件 def run(pz_config, data_dir, scale_factor=11112).
+wrapper 通过 module.run(...) 调用. scale_factor 三参签名与 ecomm 二参
+不一致 (详 [LOG.md 遗留 #7](../../../../../../../AllSQPE/Palimpzest/LOG.md)).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
 """
 
 from pathlib import Path

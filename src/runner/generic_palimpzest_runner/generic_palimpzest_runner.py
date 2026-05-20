@@ -4,6 +4,49 @@ Created on May 28, 2025
 @author: Andi Zimmerer, Jiale Lao
 
 Palimpzest system runner implementation based on generic_runner.
+
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 ADD: GenericPalimpzestRunner (核心)
+============================================================================
+
+本文件是 Palimpzest 全部 scenario wrapper 的 *基类*. 366 LoC, 提供:
+
+1. **palimpzest_config() 方法**: 核心配置注入点 (paper L1 独家功能)
+   - 读 env var `PALIMPZEST_CONFIG_FILE`
+   - 找对应 JSON 文件 (e.g. `config/system/palimpzest/gpt-4o-mini-maxquality.json`)
+   - 反序列化为 pz.QueryProcessorConfig: policy / available_models /
+     execution_strategy / max_workers / reasoning_effort
+   - **fallback 路径** (env var 不设): 写死 `MaxQuality + parallel +
+     max_workers=20`, available_models=[gemini-2.5-flash]
+
+2. **execute_query(query_id)** (abstract, scenario override):
+   - Code mode (movie/animals/mmqa): subclass 直接调内置 Q* 方法
+   - Code\* mode (cars/medical/ecomm): subclass exec() 外部 Python 文件
+
+3. **token_usage / money_cost 抽取**:
+   - `result.execution_stats.total_tokens` → GenericQueryMetric.token_usage
+   - `result.execution_stats.total_execution_cost` → money_cost
+   - 把 Palimpzest 内部 ExecutionStats 标准化到 SemBench Generic metric.
+
+4. **GenericQueryMetric 字段对齐**:
+   - SemBench 给所有 engine 统一的 metric 接口 (status / execution_time /
+     results / token_usage / money_cost / error). 各 engine wrapper
+     负责把自己内部 stats 映射到这些字段.
+
+10 个 config JSON (在 config/system/palimpzest/):
+- 5 model × 2 policy = 10:
+  - gemini-2.0-flash, gemini-2.5-flash, gpt-4o-mini, gpt-5-mini, mixed-models
+  - × {maxquality, mincost}
+- mixed-models = 4 model 同时可用 (给 Pareto 探索; SemBench 不开 Pareto
+  policy, 实际只用 MaxQuality / MinCost 单目标)
+
+**未使用的 Palimpzest 能力** (paper 主打但 L1 不开):
+- Pareto Strategy (multi-objective 优化)
+- MAB / Sentinel ExecutionStrategy (paper §4.3 Abacus)
+- 5/6 个 `allow_*` Cascades rule toggles
+- SampleBasedCostModel (走 NaiveCostModel)
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
 """
 
 import re

@@ -1,3 +1,17 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q2 (audio filter + join)
+============================================================================
+
+cars Q2: 找出"音频检测显示电池已死"的所有不同 car_id.
+Pipeline: scan car table + audio table → join (on car_id) →
+          sem_filter audio (LLM 听 audio_path 判 dead battery) → distinct.
+特点: audio-modal (depends_on=['audio_path']) + join. 是 cars 中 audio
+query (LOG.md 遗留 #4: is_audio = query_id ∈ [2,5,6,7,9]).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

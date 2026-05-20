@@ -1,3 +1,15 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* medical Q6 (multi-audio sem_map)
+============================================================================
+
+medical Q6: 用 3 个 sem_map 给同一 patient 不同 audio (path_e / path_b /
+path_d) 各跑 LLM 诊断, 输出 3 个 *_diagnosis 字段 "TRUE"/"FALSE" 字符串.
+sem_map 而不是 sem_filter 让我们保留诊断结果作为新字段 (而不是 boolean filter).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import numpy as np
 import pandas as pd

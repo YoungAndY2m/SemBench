@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* ecomm q8 (sem_join variant)
+============================================================================
+
+ecomm q8: sem_join 另一种 — 把 styles_details_ds 跟其它 dataset 用 LLM
+判语义匹配. 与 q7 类似但不同 join 谓词 / 不同 dataset 对.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

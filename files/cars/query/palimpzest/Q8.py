@@ -1,3 +1,17 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q8 (compound image filter)
+============================================================================
+
+cars Q8: 找出 image 显示 "既有穿孔 (puncture) 又有油漆划痕 (paint scratches)"
+的 car_id.
+Pipeline: scan + join → sem_filter image (LLM 在单 prompt 里判 2 个属性) → project.
+特点: 单 sem_filter 中 LLM 同时判 *复合* 条件 (而非两个 chained filter).
+LLM 的 NL 谓词支持任意复杂度.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

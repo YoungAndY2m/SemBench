@@ -1,3 +1,17 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q5 (audio + image dual filter)
+============================================================================
+
+cars Q5: 找出 audio AND image 都显示车损坏的 car_id + transmission 组合.
+Pipeline: scan + join → 串联 2 个 sem_filter (audio 判 damaged + image 判 damaged)
+          → project (car_id, transmission) → distinct.
+特点: 双 modal filter 串联. cars wrapper 把 query_id=5 列为 audio query
+([2,5,6,7,9] 之一).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

@@ -1,3 +1,15 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* ecomm q9 (image sem_join)
+============================================================================
+
+ecomm q9: image-image sem_join — 两个 images dataset 之间用 LLM 判
+视觉相似性 (e.g. same product variants). Cascades 可能选 EmbeddingJoin
+(先 image embedding 过 threshold, 再 LLM 复核) 而非 NestedLoopsJoin (太贵).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q4 (text filter on engine problems)
+============================================================================
+
+cars Q4: text-modal sem_filter "complaint 提到引擎相关问题" → project year.
+Pipeline: scan complaints + car → join → sem_filter (text engine 问题) → project.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

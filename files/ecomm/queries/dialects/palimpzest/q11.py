@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* ecomm q11 (multi-table sem_filter, multi-line prompt)
+============================================================================
+
+ecomm q11: 同 q10 模式 (multi-table footwear + bottomwear sem_filter),
+但 prompt 用 triple-quoted 多行字符串. 更复杂的 NL 谓词描述.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

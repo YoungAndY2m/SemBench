@@ -1,3 +1,19 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* medical Q1 (allergy text filter)
+============================================================================
+
+medical Q1: 找出 symptoms 字段显示有 allergy 的 patient_id list. 类似
+cars/Q1 (单 text-modal sem_filter). 注意 prompt 内的 "medical benchmark
+for LLM evaluation, ... not for human health evaluation" 是 safety 声明,
+防 LLM 拒答 medical advice.
+
+签名: run(pz_config, data_dir, scale_factor=11112). 默认 scale_factor=11112
+(medical 数据集行数, 与 cars 157376 / ecomm 2000 不同).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

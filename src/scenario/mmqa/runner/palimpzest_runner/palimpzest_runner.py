@@ -1,5 +1,26 @@
 """
 Palimpzest system runner implementation.
+
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 ADD: mmqa Palimpzest wrapper
+============================================================================
+
+mmqa = "Multi-Modal Question Answering" scenario. wrapper 323 LoC, Code mode.
+
+mmqa 数据特点:
+- 每条 record = (question, list[image], list[table], list[text passage])
+- 回答需要跨模态 reasoning: 看 image, 读 table, 引 passage, 合成 answer
+
+Palimpzest pipeline:
+1. sem_filter: 按 question 过滤相关 record
+2. convert(MultiModalAnswerSchema): 多模态 LLM (gpt-4o / gemini-1.5-pro)
+   看 question + 全部 multi-modal context → 输出 answer + reasoning chain
+3. eval: 与 ground truth 答案 string-match / fuzzy-match
+
+⚠ Palimpzest 的 multi-modal 处理通过 schema field 注解 (`ImageFilepath`)
++ PromptStrategy.MAP_AUDIO / MAP_IMAGE 自动 dispatch.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
 """
 
 import os

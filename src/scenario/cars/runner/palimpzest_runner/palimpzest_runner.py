@@ -1,5 +1,36 @@
 """
 Palimpzest system runner implementation.
+
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 ADD: cars Palimpzest wrapper
+============================================================================
+
+cars wrapper: Code\* mode (用户 query 是 Python 文件), 135 LoC.
+**注意**: 这个 wrapper 含 6 个 bug / 不一致 (详 [Palimpzest LOG.md
+遗留 #2-#8](../../../../../../../AllSQPE/Palimpzest/LOG.md)):
+
+1. **typo 2 处** ([:110](#L110)): `Model.GPT_4o_MINI_AUDIO_PREVIE` 少
+   一个 W; `Model.GPT_5_MINIW` 多一个 W. AttributeError fallback path.
+2. **硬编码 MaxQuality** ([:117-129](#L117)): 不读 PALIMPZEST_CONFIG_FILE
+   env var, 直接 `policy=pz.MaxQuality()`. 覆盖 generic wrapper 行为.
+3. **`raise "string"`** ([:114](#L114)): 不合法 Python — 应该是
+   `raise ValueError("...")`. 严格 Python 报 TypeError.
+4. **is_audio = `query_id in [2,5,6,7,9]`** ([:86](#L86)): magic numbers,
+   新加 audio query 会忘同步.
+5. **execution_strategy="PARALLEL"** ([:119,130](#L119)): 大写; config JSON
+   都用 lowercase "parallel". 看 Palimpzest 0.8.2.sem_agg 是否 case-
+   insensitive.
+6. **reasoning_effort="medium"** hardcoded ([:124](#L124)) for gemini-2.5-pro
+   分支, 但 config JSON 全是 null. cars 自己 hardcode 赢.
+
+Per-query mixed-models 策略 (audio query):
+- query_id ∈ [2,5,6,7,9] → `available_models=[GPT_4o_AUDIO_PREVIEW, GPT_5_MINI]`
+  (Palimpzest 的 mixture_of_agents 隐式路径)
+- 否则 → single text model
+
+scale_factor=157376 (cars 默认数据集行数, 写死).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
 """
 
 from pathlib import Path

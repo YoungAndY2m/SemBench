@@ -1,3 +1,16 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* medical Q2 (audio lungs healthy filter)
+============================================================================
+
+medical Q2: scan audio lungs + patient → join → sem_filter audio
+(LLM 听判 healthy lungs without disease).
+注释中带 FIXME: ".distinct()" 因 PZ 的 cost 字段 issue 暂未用; 后续输出
+DataFrame 上手动 drop_duplicates 但会丢 cost 数据.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

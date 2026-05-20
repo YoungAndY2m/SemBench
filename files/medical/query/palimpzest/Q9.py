@@ -1,3 +1,16 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* medical Q9 (dual image AND filter)
+============================================================================
+
+medical Q9: 同一 record 双 image 字段 (image_path + image_path_xray) →
+单 sem_filter (LLM 在一个 prompt 内同时看皮肤 mole + x-ray, 判 *both*
+indicate disease).
+单 sem_filter 多 depends_on 字段 = multi-image LLM call (走 LLM 多模态 API).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

@@ -1,3 +1,18 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q3 (image filter + join)
+============================================================================
+
+cars Q3: 找出 "图片显示车未被损坏" 的 VIN list.
+Pipeline: scan car_images + car table → join → sem_filter image
+          (LLM 看 image_path 判是否未损) → project VIN.
+特点: image-modal (depends_on=['image_path']). 与 audio query 不同, image
+不在 cars wrapper 的 is_audio 路径 (LOG.md 遗留 #4 magic numbers
+[2,5,6,7,9] 不含 3).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

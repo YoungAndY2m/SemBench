@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* ecomm q13 (text sem_filter)
+============================================================================
+
+ecomm q13: text-modal sem_filter on styles_details — ecomm 系列最后一个
+query. 不同谓词 / 不同 retrieve 字段.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

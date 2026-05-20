@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* medical Q3 (X-ray image filter)
+============================================================================
+
+medical Q3: scan x_rays + patient → join → sem_filter image
+(LLM 看 image_path 判 X-ray lung disease).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

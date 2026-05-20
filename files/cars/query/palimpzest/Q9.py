@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q9 (audio + image dual)
+============================================================================
+
+cars Q9: image 显示车 torn (撕裂) AND audio 显示点火 (ignition) 有问题.
+2 modal AND. cars query_id=9 是 audio query ([2,5,6,7,9]).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

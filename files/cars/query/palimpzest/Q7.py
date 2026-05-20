@@ -1,3 +1,17 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* cars Q7 (3-modal AND filter)
+============================================================================
+
+cars Q7: 找出 (audio 显示刹车磨损) AND (image 显示有凹痕) AND (text complaint
+提到电气系统问题) 的车.
+特点: 与 Q6 类似 (3 modal), 但 *AND* 语义 (3 个 filter 都过) — 与 union
+(OR) 不同, 这里走 chained sem_filter on join 结果.
+cars query_id=7 是 audio query ([2,5,6,7,9]).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

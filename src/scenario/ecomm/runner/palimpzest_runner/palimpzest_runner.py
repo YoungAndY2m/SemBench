@@ -1,6 +1,34 @@
 """
 Palimpzest system runner implementation.
 Placeholder required by the current structure of the benchmarking framework.
+
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 ADD: ecomm Palimpzest wrapper
+============================================================================
+
+本文件是 SemBench L1 ADD 文件之一 (无对应 L0 — Palimpzest 没这个文件).
+最简的 Code\* wrapper: 70 LoC, 只 override execute_query 走 Code\* mode.
+
+Code\* mode 工作流 (SemBench 术语):
+- Code\* = "Palimpzest Code dialect"; 用户 query 是一段 Python 代码
+  (在 files/ecomm/queries/dialects/palimpzest/q*.py 中, 每个文件 def run
+  函数), 用 Palimpzest fluent API 写 pipeline.
+- wrapper.execute_query(qid):
+    1. 读 query_text (Python 源码)
+    2. exec() 成 module
+    3. 调 module.run(pz_config, data_dir) → DataRecordCollection
+    4. 拿 .to_df() / .execution_stats.total_execution_cost 包成 metric
+
+scale_factor 不传 (ecomm 用户 query 不需 scale_factor; cars/medical 用).
+
+⚠ 与 LOTUS ecomm wrapper 同款路径不一致问题: query 在
+`files/ecomm/queries/dialects/palimpzest/` 而非 `files/ecomm/query/palimpzest/`
+(其它 scenario `cars/medical` 用后者). 这是 SemBench 历史遗留.
+
+money_cost = exec_stats.total_execution_cost: Palimpzest 自己累加的 LLM
+USD 总额. SemBench `GenericQueryMetric.money_cost` 字段标准化为 USD.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
 """
 
 from pathlib import Path

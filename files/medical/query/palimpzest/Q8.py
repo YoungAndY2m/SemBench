@@ -1,3 +1,14 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 Code\* medical Q8 (skin mole image filter)
+============================================================================
+
+medical Q8: scan + join → sem_filter image (LLM 看皮肤 mole 图判 malignant).
+单 image-modal filter.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
+"""
+
 import os
 import pandas as pd
 import palimpzest as pz

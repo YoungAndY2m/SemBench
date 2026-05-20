@@ -4,6 +4,34 @@ Created on Aug 8, 2025
 @author: Jiale Lao
 
 Palimpzest runner implementation for animals use case.
+
+============================================================================
+教学注释 (Annotation Pass) — SemBench L1 ADD: animals Palimpzest wrapper
+============================================================================
+
+animals wrapper: Code mode, **986 LoC = SemBench 所有 wrapper 里最大的
+单文件**. 含 image + audio 双模态处理.
+
+为什么这么大?
+1. **多模态 schema 定义复杂**: animals scenario 含 photos (image) +
+   sound recordings (audio). 每个 Pydantic schema 要标 image / audio 字段
+   (`ImageFilepath` / `AudioFilepath` 类型), Palimpzest 路由到对应 prompt
+   strategy.
+2. **Q1-Q10 各自 inline 实现**, 不像 cars/medical 走 Code\* 把 query
+   分到独立文件. Code mode 文件就是会膨胀.
+3. **Per-query model 选择**: 不同 Q 用不同模型 (gemini-2.5-pro for
+   image, gpt-4o-audio for audio, gpt-4o-mini for text). 每 Q 自带配置
+   逻辑.
+4. **复杂 join + extract pipeline**: animals 主打 multi-modal join
+   (按 species name 合并 image + sound recording + text observation).
+
+Code mode wrapper 的痛点: 改 query 要重 push wrapper; 想加新 Q11 要
+学全部 inline 模板. 适合 paper reproduce, 不适合 production.
+
+未细读 (本 session): animals 986 LoC 的具体每 Q 逻辑等 Phase 1 实验用到
+时再读. 本次只加 file-level docstring 把整体结构标清.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码 (CLAUDE.md §5.5 §D 规则).
 """
 
 import pandas as pd
