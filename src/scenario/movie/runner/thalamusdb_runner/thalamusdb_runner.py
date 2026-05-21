@@ -6,6 +6,29 @@ Created on July 29, 2025
 ThalamusDB runner implementation for movie use case.
 """
 
+# =============================================================================
+# 教学注释 pass — ThalamusDB × movie scenario (Hybrid mode + 8 inline SQL queries)
+# =============================================================================
+# Movie scenario: Movies + Reviews 两表, 跑 review sentiment 分析.
+# Hybrid mode (paper-original SQPE 独家): 这个 runner 用 inline SQL string (写在
+# _execute_q<i>() Python 方法里), 不读 files/movie/query/thalamusdb/Q*.sql.
+# 与 cars/medical scenario 相反 (那两个用 SQL 文件 + 无 _execute_q* 方法).
+#
+# 8 queries (Q1-Q8) 全部走 NLfilter('positive'/'negative') + 一些 NLjoin (same/opposite
+# sentiment). 涵盖 ThalamusDB 主要功能展示:
+#   - Q1-Q4: NLfilter + count/select/ratio (aggregation)
+#   - Q5-Q7: NLjoin pair-wise (same/opposite sentiment 对)
+#   - Q8: CASE WHEN NLfilter + GROUP BY (分组统计)
+#
+# 数据建表逻辑 (__init__):
+#   1. 调 super().__init__ 触发 scenario_handler.setup_scenario() — 生成 CSV
+#      (Movies.csv + Reviews.csv) 到 files/movie/data/sf_<N>/
+#   2. DuckDB connect → SHOW TABLES → 空则 read_csv + CREATE TABLE
+#   3. 表名: Movies / Reviews (跟 inline SQL 字段对齐)
+#
+# 注意 default model = gemini-2.5-flash; 不传 Q text 文件 → execute_query 会
+# 因 FileNotFoundError fallback 到 _execute_q<id>() 方法 (Hybrid 路径).
+# =============================================================================
 import os
 from typing import Dict, Any
 from pathlib import Path

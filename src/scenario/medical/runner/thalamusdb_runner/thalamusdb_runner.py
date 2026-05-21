@@ -6,6 +6,35 @@ Created on July 29, 2025
 ThalamusDB runner implementation for medical use case.
 """
 
+# =============================================================================
+# 教学注释 pass — ThalamusDB × medical scenario (SQL-file mode, 跨模态 Q6 中间表)
+# =============================================================================
+# Medical scenario: 3 表 + audio 设备分类
+#   - patients (病人 metadata)
+#   - lung_audio (听诊器录音, 3 种 filtration_type: bell/extended/diaphragm)
+#   - symptoms_texts (NL 症状描述)
+#   - x_ray_images (X-ray image path)
+#
+# 跟 cars 一样, 这个 runner 没 _execute_q* 方法 — Q1-Q9 全部走
+# files/medical/query/thalamusdb/Q*.sql 文件 (SQL-file mode).
+#
+# 数据建表特殊: 借用 FlockMTLMedicalSetup (跨 SQPE 共享的 setup 工具) →
+# db.setup_data(...) 装 4 张主表; ThalamusDB runner *不重新建*, 只加 2 张
+# intermediate 表给 Q6 用:
+#
+#   audio_denorm (pivot): 把 lung_audio 长格式 (1 row 1 audio file) → 宽格式
+#     (1 row per (patient_id, location), 3 列 bell/extended/diaphragm audio path).
+#     用 MAX(IF(filtration_type='bell', path, NULL)) AS bell_audio 实现 conditional pivot.
+#
+#   two_more_modalities: 笛卡尔积 patients × audio_denorm × symptoms_texts × x_ray_images,
+#     保留 "至少 2 种模态非 NULL" 的 patient row. 跟 cars/two_more_modalities 同思路.
+#
+# default model = gpt-5-mini (medical 文本量大, gpt-5 系列 long context 性价比好).
+#
+# skip_setup 参数: 如果用户传 True (e.g. 跑过一次想 reuse 数据), 跳过 setup_data
+# 但仍要建 intermediate 表 (因为 intermediate 不持久化).
+# =============================================================================
+
 from pathlib import Path
 import pandas as pd
 

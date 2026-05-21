@@ -6,6 +6,31 @@ Created on Aug 8, 2025
 ThalamusDB runner implementation for animals use case.
 """
 
+# =============================================================================
+# 教学注释 pass — ThalamusDB × animals scenario (Hybrid mode, image + audio NLfilter)
+# =============================================================================
+# Animals scenario: ImageData + AudioData 两表 (path 列指向 .jpg/.wav 文件)
+# = ThalamusDB *multi-modal NLfilter* 的典型展示.
+#
+# 10 queries (Q1-Q10) 全部 NLfilter — 没有 NLjoin (animals 没 cross-table NL 配对):
+#   - Q1/Q2: count by NLfilter(image/audio, '动物 X')
+#   - Q3/Q4: group by city + order by count(*) → 找最多的城市
+#   - Q5: UNION (image 找的城市 ∪ audio 找的城市)
+#   - Q6: NOT EXISTS subquery (有 image 无 audio 的城市)
+#   - Q7-Q9: INTERSECT (多种动物 / 多模态共现的城市)
+#   - Q10: group by (city, station)
+#
+# 数据 column 重命名 + 隐藏 ground truth (`Species` / `Animal` 列):
+#   CSV 原列: ImagePath, Species, City, StationID + AudioPath, Animal, City, StationID
+#   DuckDB 表只保留: image/audio (path), city, stationID — *隐藏* Species/Animal
+#   防止 LLM "作弊" 用 ground truth 列 (paper §9 实验设计).
+#
+# concurrent_llm_worker=1 (其它 scenario 默认 20) — 因为 audio file 上传体积大,
+# Gemini rate limit 更严, 防 429. 是 animals 独家配置.
+#
+# default model = gemini-2.5-flash (gemini 系列 native audio 支持好, openai 系列
+# audio 仅 gpt-4o-audio-preview 才能).
+# =============================================================================
 import os
 from typing import Dict, Any
 from pathlib import Path

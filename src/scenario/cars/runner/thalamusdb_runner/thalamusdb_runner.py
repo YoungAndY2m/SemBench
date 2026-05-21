@@ -2,6 +2,30 @@
 ThalamusDB system runner implementation for Cars scenario.
 """
 
+# =============================================================================
+# 教学注释 pass — ThalamusDB × cars scenario (SQL-file mode, 4 表 + Q6 中间表)
+# =============================================================================
+# Cars scenario: 多模态汽车数据 (cars + car_audio + car_complaints + car_images),
+# 跑 NHTSA 投诉数据 + audio recordings + image + 结构化 metadata 的复杂多表查询.
+#
+# ⚠ 这个 runner *没有* _execute_q* 方法 — Q1-Q9 全部走 files/cars/query/thalamusdb/Q*.sql
+# 文件 (SQL-file mode). execute_query 入口在 base class 的 try/except 里直接读 SQL
+# 文件, 不 fallback 到 Python method (没 _execute_q* 可 fallback).
+#
+# 数据建表:
+#   - 4 张主表 cars/car_audio/car_complaints/car_images 各从 sf_<N>/CSV 读
+#   - audio_path / image_path 转 absolute path (CSV 里是 repo-relative)
+#   - two_more_modalities = Q6 专用 intermediate table:
+#     pre-compute "至少有 2 种模态" 的 car_id 笛卡尔积 (audio+text / image+text / image+audio).
+#     XOR-style 中间结果, 节省 Q6 (paper Q6 = "多模态一致性检查") 跑时间.
+#
+# scale_factor: sf_001 / sf_01 / sf_1 等子目录 — SemBench 多 scale 实验设计;
+# 数据生成由 cars/setup/ 跟 cars_data_gen 配合.
+#
+# ⚠ LOG_STRUCTURE.md §10.3 bug: cars/setup/thalamusdb.py 装 FlockMTL extension
+# (dead code, copy-paste 错). 这个 runner *不调* 那个 setup, 直接自己 duckdb.connect.
+# =============================================================================
+
 from pathlib import Path
 import sys
 import duckdb

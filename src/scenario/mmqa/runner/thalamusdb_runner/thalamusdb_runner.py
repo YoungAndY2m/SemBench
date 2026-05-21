@@ -1,3 +1,26 @@
+# =============================================================================
+# 教学注释 pass — ThalamusDB × mmqa scenario (Hybrid mode, 多 sub-query)
+# =============================================================================
+# MMQA (Multi-Modal Question Answering) scenario: 4 表 (ap_warrior, movies,
+# tampa_airport, images) 跨模态 + 多种 sub-query 类型.
+#
+# Query 结构特殊: 不是简单 Q1-Q10, 而是 Q2a/Q2b/Q3a-Q3g/Q4-Q7 等带子标号 — 因为
+# MMQA paper 是一组 *sub-query 集合*, 不全部能用 ThalamusDB 表达 (SQPE 覆盖能力对比).
+#
+# 4 个 unsupported (NotImplementedError):
+#   - Q1, Q2b, Q4, Q5: 需要 "semantic extract / map / summarize" 算子, ThalamusDB
+#     只有 NLfilter / NLjoin 不支持 extract (e.g. "把 description 抽出 director 名字").
+#     SemBench 拿这做 SQPE 能力对比 (Palimpzest / LOTUS 能跑这些 Q, ThalamusDB 不能).
+#
+# 14 个 supported:
+#   - Q2a: NLjoin (track 名 ↔ logo image)
+#   - Q3a-Q3g: 7 个 NLfilter 同表不同 condition (genre 分类)
+#   - Q6a/b/c: NLfilter (airline 飞往 X 的目的地)
+#   - Q7: NLjoin (airline 名 ↔ logo image)
+#
+# 数据 setup 用 _add_table → read_csv_auto, 跟其它 scenario 的 `register + CREATE TABLE`
+# 略不同 (这里更简洁, 但走 DuckDB 内置 CSV 解析).
+# =============================================================================
 import os
 from pathlib import Path
 from typing import Any, Dict

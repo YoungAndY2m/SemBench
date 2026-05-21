@@ -4,6 +4,55 @@ Generic ThalamusDB runner base class
 @author: Jiale Lao
 """
 
+# =============================================================================
+# 教学注释 pass — SemBench L1 wrapper for ThalamusDB (paper-original SQPE)
+# =============================================================================
+# 这个文件是 SemBench 标准 `GenericRunner` 接口的 ThalamusDB 实现. 把 L0
+# 的 `tdb.execution.engine.ExecutionEngine.run(query, constraints)` 包成
+# `execute_query(query_id) → GenericQueryMetric` 让 SemBench 评测框架可用.
+#
+# L0 vs L1 责任分工:
+#   - L0 (AllSQPE/ThalamusDB/): ExecutionEngine, anytime AQP, 2^N defaults,
+#     NL operators — 算法+ system 本体
+#   - L1 (this file): SemBench 适配, scenario 数据加载, token → money cost 转换,
+#     query dispatcher (SQL 文件 vs Python method "Hybrid mode")
+#
+# 关键设计:
+#
+# 1. Hybrid query dispatcher (paper-original SQPE 独家):
+#    execute_query(query_id) 先尝试 `scenario_handler.get_query_text(qid, 'thalamusdb')`
+#    → 读 `files/<scenario>/query/thalamusdb/Q<id>.sql` 文件
+#    找不到 fallback `_discover_query_impl(query_id)` → 调 self._execute_q<id>() 方法
+#    (子类 e.g. movie/animals/mmqa/cars/medical/ecomm 各自实现).
+#    这种 SQL-or-Python 混合方式 SemBench 里只有 ThalamusDB 用 (LOTUS 是 Code+Code*,
+#    FlockMTL 纯 SQL, Palimpzest 纯 Python).
+#
+# 2. ⚠ AQP 默认关闭 (LOG_STRUCTURE.md §10.3 bug):
+#       Constraints(max_calls=1e11, max_seconds=6000, max_tokens=1e22)
+#    4 个 upper bound 都设到天文数字 + max_error 没设 (default 0) → 等同 exact mode.
+#    ThalamusDB paper §6 主打 "anytime AQP", 但 SemBench 评测里 *从来没启用过*.
+#    要做 PLAN P0 实验 (interval SE 对照) 必须 patch 这里, 把 4 个 constraint
+#    暴露给 SemBench `--model` / config.
+#
+# 3. PRICING table — 把 LLM token usage 转 USD:
+#    每个 model 的 (text_input, audio_input, output) per-million-token rate.
+#    Audio token 单独算 (gpt-4o-audio-preview 输入 audio 更贵).
+#    数字来源: OpenAI/Gemini 官方价格页面 2025 snapshot. 价格变动需 update.
+#
+# 4. model_name_to_file_name — 把 SemBench `--model gemini-2.5-flash` 映射到
+#    config/system/thalamusdb/<file>.json 路径. 3 个 entry 写死, 加新 model
+#    要改这个 dict + 加对应 json (LOTUS / Palimpzest 是 config 自动 lookup).
+#
+# 涉及的术语:
+#   - GenericRunner / GenericQueryMetric — SemBench 标准 base class + dataclass
+#     (其它 system 比如 LOTUS / Palimpzest 也都继承 GenericRunner)
+#   - scenario_handler — SemBench 的 per-scenario data + query 加载工具
+#   - Hybrid mode — SemBench 术语, 指 SQL 文件优先 + Python fallback 的 dispatcher
+#   - max_error 默认 0 = exact mode = 跑到 UB == LB
+#
+# 调用方: SemBench framework 通过子类 (e.g. AnimalsThalamusDBRunner) 实例化 + 调
+#         execute_query(qid). 子类一般 override _execute_q<id>() 方法.
+# =============================================================================
 import time
 import pandas as pd
 from typing import Dict, Any, List, Optional
@@ -145,6 +194,27 @@ class GenericThalamusDBRunner(GenericRunner):
                 results=self._get_empty_results_dataframe(query_id),
             )
 
+    # -------------------------------------------------------------------------
+    # execute_thalamusdb_query: 跑一条 ThalamusDB SQL → 返 (result_df, token, cost)
+    # -------------------------------------------------------------------------
+    # 流程:
+    #   1. Query(self.db, sql_query) — 用 tdb.queries.Query 解析 (含 NL operator)
+    #   2. 如果 query.semantic_predicates 非空 → engine.run() 走 anytime loop
+    #      - 输出 (result_df, costs); costs.model2counters 是 dict
+    #      - 遍历每个 model, 用 PRICING 算 cost_usd, 累加 token + cost
+    #   3. 否则直接 self.db.execute() (pure SQL fast path) — 不走 anytime
+    #
+    # ⚠ "result_df, costs = engine.run(...)" 拆 tuple: ThalamusDB L0 返回
+    #    (best_guess_df, TdbCounters). 这里只用了 best_guess, *丢掉了 LB/UB interval*
+    #    → PLAN P0 interval SE 实验需要 patch 这里把 lower_bounds/upper_bounds 也存进 metric.
+    #
+    # ⚠ "Palimpzest might loose column names" 注释是 copy-paste 残留, 跟 ThalamusDB
+    #    无关. ThalamusDB result 永远是 DataFrame, 不会走 isinstance(set) 分支.
+    #
+    # ⚠ non_audio_tokens = max(0, input_tokens - audio_tokens):
+    #    防 input_tokens 没 split 模态时 (老模型 prompt_tokens_details 为 None) audio_tokens
+    #    = 0 → 全算 text 价 (正确的回退).
+    # -------------------------------------------------------------------------
     def execute_thalamusdb_query(self, sql_query: str) -> Dict[str, Any]:
         """
         Execute a ThalamusDB SQL query and return results with metrics.
