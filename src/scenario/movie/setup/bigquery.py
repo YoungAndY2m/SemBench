@@ -1,3 +1,19 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — Movie scenario 的 BigQuery 数据初始化
+============================================================================
+跟 animals/setup/bigquery.py 同模板, 但额外 import 了 transfer_manager (跟
+ecomm/mmqa 同, 用 upload_many_from_filenames 16 worker 并发). 数据集名 movie,
+表内容是 Movies + Reviews (单 text modality, 不像 cars/medical 是多 modality).
+详细 pattern 解释见
+[../../animals/setup/bigquery.py](../../animals/setup/bigquery.py) docstring +
+[../../ecomm/setup/bigquery.py](../../ecomm/setup/bigquery.py) 的 transfer_manager
+说明.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 import os
 import pandas as pd
 from google.cloud import bigquery, storage

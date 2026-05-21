@@ -1,3 +1,34 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — Ecomm scenario 的 BigQuery 数据初始化
+============================================================================
+本文件负责把 ecomm (fashion-product-images) 数据集上传到 BigQuery + GCS:
+
+1. **`setup_data(data_dir)`**: 主入口
+   - 在 BigQuery 创建 dataset `fashion_product_images` (在 US region)
+   - 上传 3 个 parquet → 3 个 BigQuery 表: STYLES / STYLES_DETAILS / IMAGE_MAPPING
+   - 上传 ~44K JPG 图片到 GCS bucket, 再在 BigQuery 创建 EXTERNAL TABLE 引用
+
+2. **`_upload_parquet_to_bigquery`**: 用 `load_table_from_file` 把 parquet
+   一次性 load 进表; WRITE_TRUNCATE = 存在表就先清空 (幂等).
+
+3. **`_upload_images_to_gcs`**: 用 `transfer_manager.upload_many_from_filenames`
+   16 worker 并发上传; 若 bucket 不存在则创建, 存在则先清空 (确保新 SF 干净).
+   上传完用 CREATE EXTERNAL TABLE + WITH CONNECTION 把 GCS 上的 jpg 当 BigQuery
+   外部表 (后续 SQL 用 OBJECT_REF 引用图片传给 Gemini 多模态 LLM).
+
+**BigQuery EXTERNAL TABLE 速记**: `CREATE EXTERNAL TABLE ... WITH CONNECTION ...
+OPTIONS(object_metadata='SIMPLE', uris=['gs://bucket/*.jpg'])` — BigQuery 不存
+图片本身, 而是引用 GCS path, 调用时按需读. object_metadata='SIMPLE' 表示存
+基本元数据 (uri / size / updated), 不抽 deep metadata.
+
+★ GOOGLE_APPLICATION_CREDENTIALS 环境变量是 GCP SDK 的标准入口, 指向
+service-account JSON, 用来认证 BigQuery + GCS 客户端.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 import os
 from google.cloud import bigquery, storage
 from google.cloud.storage import transfer_manager

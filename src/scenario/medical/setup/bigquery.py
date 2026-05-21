@@ -1,3 +1,16 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — Medical scenario 的 BigQuery 数据初始化
+============================================================================
+跟 animals/setup/bigquery.py 同模板; 数据集名换成 medical_dataset, 表内容是
+5 modality (patient + audio_lung + image_x_ray + text_symptoms + image_skin).
+详细 pattern 解释见
+[../../animals/setup/bigquery.py](../../animals/setup/bigquery.py) docstring.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 import pandas as pd
 from google.cloud import storage, bigquery
 from google.api_core.exceptions import NotFound

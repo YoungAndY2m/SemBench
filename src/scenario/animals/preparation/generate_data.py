@@ -12,6 +12,26 @@ different cities have different numbers of images for different animal species
 
 Or to use Google Drive download:
 python3 generate_data.py --download-from-drive --scale-factor 500
+
+============================================================================
+教学注释 (Annotation Pass) — Animals scenario 的数据生成脚本 (standalone)
+============================================================================
+本文件是 *standalone 脚本*, 跑一次产生 animals scenario 的 sample 数据集 (CSV
++ image/audio 文件) 给 SemBench 实验用. 流程:
+
+1. **`download_from_google_drive()`**: 从 Drive 拉 wildlife.zip 解压;
+   也支持原始 Kaggle 路径 (作者本地路径模式).
+2. **Sample 逻辑**: 按 scale_factor 抽取 N 张图片 + M 个音频; 不同 city 分配
+   不同的物种 (zebra / elephant / monkey / ...) 数量, 模拟 paper queries
+   (e.g. Q3 "城市 with most zebra pictures" 需要不均匀分布才有意义).
+3. **输出**: `data/sf_{scale_factor}/image_data.csv` + `audio_data.csv` + 实际
+   图片/音频文件 copy 到 sample folder.
+
+★ scale_factor 是 SemBench 的实验维度: 越大数据越多, 实验越慢但 LLM cost 也
+越高. paper 通常用 500 / 1000 / 5000 几个档.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 '''
 import argparse
 import pandas as pd

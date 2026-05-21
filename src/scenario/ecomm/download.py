@@ -2,6 +2,35 @@
 
 """
 Standalone script for downloading and processing the Fashion Product Images dataset.
+
+============================================================================
+教学注释 (Annotation Pass) — Ecomm scenario 的数据下载脚本 (standalone)
+============================================================================
+本文件是 *standalone 脚本* 不是模块. 流程:
+
+1. **`download_from_google_drive()`**: 从 Google Drive 下载 `ecomm.tar.gz`
+   (文件 ID 写死: `1fVV9PLgIMT-e-zxFM5ksdnN8xQlfgnmb`), 解压到
+   `files/ecomm/source_data/fashion-dataset/`. 尝试 3 个备选下载方法:
+   - Method 1: gdown --fuzzy (handles large files via Google Drive's confirm token)
+   - Method 2: wget + cookie + confirm token (手动模拟 Drive 的大文件确认流程)
+   - Method 3: curl -L (跟随重定向)
+   每个 method 成功 = 文件下来且 >1MB; 否则尝试下一个.
+
+2. 解压后, *没列出但可推断*: 后续脚本用 duckdb 把 fashion-dataset/styles.json
+   转 parquet (read_json + COPY TO 'parquet'), 给 ecomm/setup/bigquery.py 用.
+
+3. **import pyarrow.parquet as pq + duckdb**: 用 DuckDB 读 fashion-dataset
+   原始 JSON, 输出 parquet 文件.
+
+★ Google Drive 大文件下载注意: > 25MB 文件 Drive 会弹"确认下载"对话框, 不能直接
+wget; 必须先用 cookie + confirm token (Drive 返回 redirect token) 再下. 这就是
+本脚本 Method 2 复杂逻辑的来源.
+
+★ ecomm.tar.gz 大约 22 GB (跟 SESSION_HANDOFF.md §3.F 待办里提到的同一个文件),
+跑这个脚本前要确保磁盘空间充足.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 import os

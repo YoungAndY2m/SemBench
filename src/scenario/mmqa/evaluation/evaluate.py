@@ -1,5 +1,44 @@
 """Evaluator for the MMQA dataset."""
 
+# ============================================================================
+# 教学注释 (Annotation Pass) — MMQA (MultiModal QA) scenario evaluator
+# ============================================================================
+"""
+============================================================================
+MMQA = paper 的 "MultiModal Question Answering" benchmark (image / table /
+text 混合). 与 animals/cars 不同, ground truth 不是 SQL 跑出来的 dataframe,
+而是预先准备的 JSON 文件 `query/natural_language/q<qid>.json`, 每个 JSON 含
+一个 'ground_truth' 字段 (list 或 dict).
+
+本文件做 3 件事:
+
+1. **`_get_ground_truth(qid)`**: 直接 copy GT JSON 文件到 `raw_results/ground_truth/Q<qid>.json`,
+   返回原 path (不读内容).
+
+2. **`compute_metrics(results, ground_truth)`** (模块级函数): 计算 P/R/F1.
+   - tp = 命中数, fp = 错命中数; precision = tp/(tp+fp), recall = tp/|gt|
+   - 注意 tp+fp 必须 == len(results) (即 results 里每个都被分类成 TP 或 FP)
+
+3. **`_evaluate_qN(sys, gt_path)`** (7 个 query): per-query 各有差异:
+   - Q1, Q3, Q5, Q6 (单列 set): 抽 system_results 的某列 (director / title /
+     actor / Airlines) 跟 gt set 比.
+   - Q2, Q7 (image_id 组合): 把 BigQuery 的 'uri' / Palimpzest 的 'filename'
+     列名都改成 'image_id' (跨 engine 对齐); 再拆 path / 解码 %2e → '.',
+     组成 (ID, image_id) 或 (Airlines, image_id) tuple set.
+   - Q4 (genre, movie 组合): system_results 每行 movies_in_genre 用 ',' split,
+     生成 (genre, movie) tuple set.
+   - Q5 (兼容两种列名): system_results 可能有 '_output' (一些 engine 输出)
+     或 'actor' (LOTUS 输出), 都接受.
+
+★ paper §X.Y 中 MMQA 的 q1-q7 各 query 的 natural-language 描述见
+[../mmqa_scenario.py](../mmqa_scenario.py) (有更详细的 query intent 说明).
+★ query_id 也可能是 string "3a" / "3b" (variant), 这里 int(...[:-1]) 强制
+转回数字 — 同一 query 的 a/b 变体共享 evaluator.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 import json
 import shutil
 from typing import Union
@@ -14,6 +53,10 @@ from evaluator.generic_evaluator import (
 )
 
 
+# ---------------------------------------------------------------------------
+# 通用 set-based P/R/F1 (MMQA 7 个 query 都用这个), 不放进 GenericEvaluator
+# 因为它接受 list 而不是 DataFrame (MMQA 的特殊性: GT 是 JSON 不是 SQL 结果).
+# ---------------------------------------------------------------------------
 def compute_metrics(results: list, ground_truth: Union[set, list]):
     tp = 0
     fp = 0

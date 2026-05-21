@@ -5,9 +5,30 @@ Created on Dec 3, 2025
 
 Creates test database from the following Kaggle datasets:
 - https://www.kaggle.com/datasets/hendrichscullen/vehide-dataset-automatic-vehicle-damage-detection
-- https://www.kaggle.com/datasets/jutrera/stanford-car-dataset-by-classes-folder 
-- https://www.kaggle.com/datasets/malakragaie/car-diagnostics-dataset 
+- https://www.kaggle.com/datasets/jutrera/stanford-car-dataset-by-classes-folder
+- https://www.kaggle.com/datasets/malakragaie/car-diagnostics-dataset
 - https://www.kaggle.com/datasets/alshival/nhtsa-complaints?select=complaints.csv
+
+============================================================================
+教学注释 (Annotation Pass) — Cars scenario 的数据生成脚本 (standalone)
+============================================================================
+本文件是 6 个 scenario 中 *最大* 的 data-gen 脚本 (1424 LoC). 跟 animals 同
+模式但 4 modality 都要处理 (cars 主数据 + audio 引擎声 + image 损伤照片 +
+text complaints). 流程:
+
+1. **`_download_from_drive()`**: 从 Drive 下载 raw_data.zip 解压 (4 个 Kaggle
+   数据集打包).
+2. **Sample + label**: 按 scale_factor 抽 N 辆 car, 关联出对应 audio / image /
+   text complaint 记录. 生成 *full* (含 labels) + *sample* (sample 后) 两套.
+3. **输出**: `data/full_data/*_full.csv` (含 labels, 给 GT 用) +
+   `data/sf_{scale_factor}/*_{scale_factor}.csv` (sample, 给 runner 用).
+
+★ paper "full data + sample data" 分两套: full 含 ground-truth label, sample
+没有 (实验时 LLM 来预测); evaluator 用 full data 的 label 算 GT, 用 sample 的
+id 过滤 (见 cars/evaluation/evaluate.py docstring).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 import argparse

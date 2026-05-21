@@ -1,3 +1,28 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — Animals scenario 的 BigQuery 数据初始化
+============================================================================
+跟 ecomm/setup/bigquery.py 同模式 (BigQuery dataset + GCS bucket + EXTERNAL
+TABLE for images), 但有 3 个差异:
+
+1. **更细的 dataset/table 管理**: `create_bq_dataset_and_table()` 显式 catch
+   NotFound, 决定 get_dataset / create_dataset; 比 ecomm 的
+   `create_dataset(..., exists_ok=True)` 更冗长但更显式.
+
+2. **GCS 上传走 concurrent.futures + per-file upload_from_filename** (不像
+   ecomm/mmqa 用 transfer_manager.upload_many_from_filenames 一把梭) — 比较
+   旧 style, 但更容易拼自定义返回值 (返回 [gcs_uri, *add_cols], 后续用 add_cols
+   补充 label 列).
+
+3. **hashlib import 没用 (dead)** — 可能是历史代码痕迹.
+
+★ PROJECT_ID = "bq-mm-benchmark" 跟 mmqa/setup/bigquery.py 同, 是 paper 作者
+写死的 GCP 项目 id, 跑前用户必须改.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 import pandas as pd
 from google.cloud import storage, bigquery
 from google.api_core.exceptions import NotFound

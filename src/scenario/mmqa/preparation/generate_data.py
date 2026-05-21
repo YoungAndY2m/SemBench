@@ -1,3 +1,31 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — MMQA scenario 的数据生成脚本 (standalone)
+============================================================================
+本文件是 MMQA scenario 的 data-gen 脚本 (315 LoC). MMQA = MultiModal QA,
+跟其它 scenario 不同, 数据集是 *预先准备好* 的 (固定 CSV + image), 不是从
+Kaggle / Drive 现下载. 流程:
+
+1. **`MMQADataGenerator(working_dir, scale_factor, skip_download)`**:
+   - scale_factor 必须在 [25, 1000] 范围内 (paper 定义)
+   - working_dir / files/mmqa/source_data 是源数据位置, output_data_dir 是输出位置
+
+2. **FIXED_FILES** = 2 个核心 CSV (ben_piazza + ap_warrior), 不随 scale_factor 变;
+   其它表 (ben_piazza_text_data / lizzy_caplan_text_data / tampa_international_airport)
+   有 base 版本 + additional 版本, sample 时按 scale_factor 取一部分.
+
+3. **8 个 FIXED 图片**: 是 query 必需的特定图片 (image-id 写死), 不能 sample 掉
+   否则 query 找不到引用; 其它图片按 scale_factor 抽样.
+
+4. **输出**: `output_data_dir/sf_{scale_factor}/` 下 CSV + image 文件夹.
+
+★ MMQA 的 fixed-file pattern 是因为 paper queries 都引用特定 entity (ben_piazza,
+lizzy_caplan, tampa_international_airport), sample 必须保留这些 entity 才能跑.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 import argparse
 import os
 

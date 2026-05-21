@@ -2,6 +2,38 @@
 Created on Jun 28, 2025
 
 @author: OlgaOvcharenko
+
+============================================================================
+教学注释 (Annotation Pass) — Medical scenario evaluator
+============================================================================
+跟 animals/movie evaluator 同模式 (GenericEvaluator 子类) 但有 3 个 medical
+特色:
+
+1. **多模态数据加载**: `_load_domain_data` 同时加载 5 个 df:
+   - patient_df (主表 + labels)
+   - audio_df (lung audio)
+   - image_x_ray_df (X-ray)
+   - symptoms_text_df (文字症状)
+   - skin_cancer_df (皮肤图像)
+   各 modality 对应一个 SQPE engine 的"语义函数" (audio_diagnosis / x_ray_diagnosis /
+   text_diagnosis / image_skin_diagnosis).
+
+2. **scale_factor 路径模板**: 文件名 *没* scale_factor 后缀的是 11112 (默认 SF);
+   其它 SF 加 `_{SF}` 后缀. e.g. `patient_data_with_labels.csv` vs
+   `patient_data_with_labels_5000.csv`. 这种 "默认 case 省略后缀" 在多处重复
+   (5 个数据集 × 2 个分支 = 10 个 ternary), 是 paper 数据集发布的 convention.
+
+3. **ground truth 缓存**: `_get_ground_truth(qid)` 先看 `raw_results/ground_truth/Q<qid>.csv`
+   是否存在, 是的话直接读 (避免重复算); 否则调 `_generate_q<qid>_ground_truth()` 算并落盘.
+   per-query ground-truth 函数都是 pandas boolean indexing (跟 sql_queries.py 里的 pandas
+   path 等价, 见 [sql_queries.py](sql_queries.py)).
+
+★ medical 跟 cars/animals 不同点: 用 `sklearn.metrics.precision_recall_fscore_support`
+而不是手算 P/R/F1 — 这是为了支持 multi-class (e.g. smoking_history 有 Never /
+Former / Current 三类).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 from pathlib import Path

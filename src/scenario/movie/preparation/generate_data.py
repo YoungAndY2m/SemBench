@@ -17,6 +17,24 @@ python3 generate_data.py .cache/kagglehub/datasets/andrezaza/clapper-massive-rot
 
 Or to use Google Drive download:
 python3 generate_data.py --download-from-drive --scale-factor 2000
+
+============================================================================
+教学注释 (Annotation Pass) — Movie scenario 的数据生成脚本 (standalone)
+============================================================================
+本文件是 movie scenario 的 data-gen 脚本 (403 LoC). 跟其它 scenario 不同, 只
+1 modality (文本评论). 数据源: rotten_tomatoes movies + reviews. 流程:
+
+1. **`download_from_google_drive()`**: 从 Drive 下载 movie.zip (Rotten Tomatoes
+   movies + reviews CSV) 解压.
+2. **6 条 sampling 原则** (上面 docstring 列了): 优先取评论多 + 长 + 含特定模式
+   (积极/消极混合 / 全负面) 的 movie, 保证后续 query 有合理的 GT.
+3. **输出**: `data/sf_{scale_factor}/Movies.csv` + `Reviews.csv` (2 个表).
+
+★ paper 的 movie scenario 主要测 LLM 的 *情感分析* 能力 (Q1-Q10 大多围绕
+review sentiment), 所以 sampling 要确保 sentiment 分布有挑战性.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 import argparse

@@ -1,3 +1,29 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — Medical scenario gold-SQL 验证脚本
+============================================================================
+本文件不是 module, 是 *独立验证脚本* (跑一遍打印 Q1-Q7 是否通过). 作用:
+- 把 4 个 medical CSV (patient / audio / image / text) 加载到 in-memory DuckDB
+- 对 Q1-Q7 各自跑 *两条* 等价计算:
+  1. SQL 路径: `con.execute(<SQL>).fetchdf()` 走 DuckDB
+  2. pandas 路径: 直接对 `patient_df` 做 boolean indexing
+- 比对两条结果是否一致 (.equals / .isin / .values 对比), print 结果 (True/False)
+
+这是 paper 作者写 gold SQL 时的自检脚本: 确保 SQL 语义跟 pandas 等价
+(避免 gold SQL 错了, 害下游 evaluator 比错). 跑一次手动看 print 输出.
+
+★ 注意几处 SQL bug / 不一致:
+- Q3: `did_family_have_cancer == 1` 用了 Python `==` 不是 SQL `=` (DuckDB 容忍
+  Python 风格); LIMIT 5 但 pandas 路径没 limit
+- Q7: SQL `FROM patient_df` (用 pandas 变量名当表名) — 走 DuckDB 的"Python
+  fragment integration" (自动识别外部 df 变量); 跟其它 Q 的 'patients' 不一致
+- Q3 比较用 `.isin(gt).all().all()` 不是 `.equals(gt)`, 因为 LIMIT 让两边不
+  完全相同, 只要 SQL 结果是 gt 的子集就 OK
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 from pathlib import Path
 
 import numpy as np

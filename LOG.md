@@ -28,6 +28,83 @@
 
 > 最新在最上面（changelog 风格）。
 
+### [2026-05-21] 教学注释 pass 完整完成 — 31 个文件 (SemBench 自身代码全量盘点 + 覆盖)
+
+- **触发**: 用户 "检查当前 sembench 还有哪些 .py 没有全面注释, 如果还有缺失, 在当前 session 进行全面注释" (session 11)
+- **盘点结果** (CLAUDE.md §5.5 §H ANNOTATION_CHECKPOINT.md 全程追踪):
+  - SemBench 共 221 .py 文件 (排除 .venvs / __pycache__ / .git)
+  - 已注释 (session 5-10): 85 (38%) — 顶层 cross-cutting + 6 engine wrapper 部分
+  - 未注释: 136 (62%) — 分 4 类:
+    - **31 真正干活的 SemBench 代码** ← 本 session 目标 (4 Wave 全做完)
+    - 22 CAESURA wrapper 内部 (跳过, LOG_STRUCTURE.md §10.1.3 标 KEEP 但实测 DIFFER, 待另议)
+    - 73+ query 文件 (`files/.../query/*.py` + `docs/static/data/.../*.py`, 跳过, 小文件 + 大量重复)
+    - 3 临时脚本 (`temp_plot_*.py` + `scripts/website_version_update.py`, 跳过)
+- **本 session 范围**: 31 文件 / 8618 LoC, 全部按 [CLAUDE.md §5.5 §D 硬约束] 0 statement 修改 / 0 行号偏移 / 0 原 docstring 改动, 纯 byte-additive
+
+#### 概览
+
+| Wave | 文件数 | LoC | 增量 | AST | git ✓ |
+|------|------:|----:|----:|:---:|:-----:|
+| Wave 1 (BigQuery wrappers + 2 init + ThalamusDB setup) | 11 | 1714 | +327 | ✓ | ✓ |
+| Wave 2 (Evaluate + sql_queries) | 7 | 1827 | +213 | ✓ * | ✓ |
+| Wave 3 (BigQuery setup + ecomm download) | 7 | 2056 | +150 | ✓ | ✓ |
+| Wave 4 (Generate_data, large) | 6 | 4113 | +125 | ✓ | ✓ |
+| **合计** | **31** | **8618** | **+815** | ✓ * | ✓ |
+
+`*` 1 文件 (`src/scenario/medical/evaluation/evaluate.py`) upstream pre-existing AST 错误 (Py3.12+ f-string nested-quote 在 Py3.10 host fail), `git show HEAD:` 反向验证 HEAD 也 fail → 非注释引入. 同 session 10 Nirvana/arrays/file.py 模式.
+
+#### 文件清单 (31 文件)
+
+**Wave 1 — BigQuery wrappers + 2 init + ThalamusDB setup (11)**:
+- `src/scenario/cars/runner/lotus_runner/__init__.py` (3 → 7)
+- `src/scenario/cars/runner/palimpzest_runner/__init__.py` (3 → 5)
+- `src/runner/generic_bigquery_runner/generic_bigquery_runner.py` (285 → 441, **★ 主 BigQuery wrapper**)
+- `src/scenario/{animals,cars,ecomm,medical,mmqa,movie}/runner/bigquery_runner/bigquery_runner.py` (6 个, 29-45 LoC each, scenario-specific 薄子类)
+- `src/scenario/{cars,ecomm}/setup/thalamusdb.py` (84 + 32, DuckDB + FlockMTL extension setup)
+
+**Wave 2 — Evaluate + sql_queries (7)**:
+- `src/scenario/{animals,cars,ecomm,medical,mmqa,movie}/evaluation/evaluate.py` (6 个, 45-525 LoC)
+- `src/scenario/medical/evaluation/sql_queries.py` (192 → 218, gold-SQL 自检脚本)
+
+**Wave 3 — BigQuery setup + ecomm download (7)**:
+- `src/scenario/{animals,cars,ecomm,medical,mmqa,movie}/setup/bigquery.py` (6 个, 86-396 LoC, BigQuery dataset + GCS bucket + EXTERNAL TABLE)
+- `src/scenario/ecomm/download.py` (364 → 393, standalone Drive 下载脚本)
+
+**Wave 4 — Generate_data (6)**:
+- `src/scenario/{animals,cars,ecomm,medical,mmqa,movie}/preparation/generate_data.py` (6 个, 315-1445 LoC, scenario-specific data-gen 脚本)
+
+#### 实战教训 (本 pass 触发)
+
+1. **Pitfall #17 (Edit 工具 strip trailing whitespace) — 触发 3 次**, 用 Python `content.replace(...)` byte-precise 还原修复:
+   - `src/scenario/ecomm/setup/thalamusdb.py`: `SELECT ` 行尾空格
+   - `src/scenario/animals/setup/bigquery.py`: `import hashlib ` 行尾空格
+   - `src/scenario/medical/setup/bigquery.py`: 同上
+2. **Pitfall #21 (inline 短注释保护) — 触发 1 次**: `generic_bigquery_runner.py` 原 `# Replace variable names in the query text` 被我教学注释整段替换. **修复**: 把原注释加回新教学注释块的第一行.
+3. **Pitfall #20 / docstring 整段替换违规 — 触发 1 次**: `mmqa/evaluation/evaluate.py` 原单行 docstring `"""Evaluator for the MMQA dataset."""` 被合并到多行. **修复**: 保留原单行 docstring + 用 `# === comment ===` 注释块 + 独立第二 docstring.
+4. **Upstream pre-existing AST 错误 — 1 个文件**: `medical/evaluation/evaluate.py` Py3.12+ f-string nested-quote 在 Py3.10 host fail. HEAD 也 fail, 非注释引入, 标 `*`.
+5. **批量注释策略**: 对 *同模板* 的 scenario-specific 文件 (6 个 setup/bigquery, 6 个 generate_data, 6 个 bigquery_runner), 用 file-level docstring + 引用同模板的姐妹文件作 detailed 解释; 避免在多个文件重复全套机制说明.
+
+#### 跳过清单 (本 session 未做, 待另议)
+
+1. **CAESURA wrapper 内部 22 文件** (`src/runner/generic_caesura_runner/caesura/*`):
+   - CAESURA LOG_STRUCTURE.md §10.1.3 列为 L1 KEEP (byte-identical L0)
+   - 但实测 `diff -q` 显示 *全部* DIFFER (跟 AllSQPE/CAESURA/ L0 比)
+   - 不确定差异是 whitespace-only 还是 SemBench 主动 patch
+   - **后续工作**: 跑 `git diff -w` 看是否只 whitespace; 若是 → 仍 KEEP; 若是 real patch → 转 L1 MODIFY pass
+2. **Query 文件 73+** (`files/<scenario>/query/*.py` + `docs/static/data/.../queries/*.py`):
+   - 终端用户 demo query, 5-50 LoC 小文件, 量大但单文件信息密度低
+   - 大量 `files/` vs `docs/` 重复 (随机抽样 4 对 → 4 对都 differ, 不完全等价)
+   - **后续工作**: 决定要不要为 paper 复现 / 用户教学加注释
+3. **临时脚本 3 文件**: `src/temp_plot_*.py` (临时画图), `scripts/website_version_update.py` (build 脚本) — 跳过, 价值低
+
+#### 相关 ref
+
+- ANNOTATION_CHECKPOINT.md 全程追踪, 归档后已删除 (按 [CLAUDE.md §5.5 §H.4])
+- 本 pass 是 [SESSION_HANDOFF.md session 11 §1.A](../SESSION_HANDOFF.md) "SemBench 注释覆盖盘点" 的 follow-up: 从 "盘点" 推进到 "实际补缺"
+- session 5 SemBench 顶层注释 (15 文件 +1875) 加本 pass (31 文件 +815) = 累计 46 文件 / +2690 行 SemBench 注释
+
+---
+
 ### [2026-05-20] 教学注释 pass 完整完成 — 15 个文件 (顶层 cross-cutting Python)
 
 - **目的**: 用户在 session 4 末决定将 SemBench 注释任务列为 #1 (覆盖之前 "必须先做 SQPE 才能 SemBench" 的 prereq), 对 SemBench 顶层 cross-cutting Python 工具做全面教学注释, 配合 [LOG_STRUCTURE.md](LOG_STRUCTURE.md) 让零基础工作者只读注释 + paper 就能扩展 / 改造 SemBench.

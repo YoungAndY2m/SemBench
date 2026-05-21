@@ -5,6 +5,32 @@ Created on July 27, 2025
 
 MovieEvaluator Implementation based on generic_evaluator
 Uses DuckDB with ground truth SQL queries to generate reference results
+
+============================================================================
+教学注释 (Annotation Pass) — Movie scenario evaluator
+============================================================================
+跟 animals_evaluator 同模式 (GenericEvaluator 子类 + DuckDB GT). Movie scenario
+有 10 个 query, 涉及 3 种 metric type:
+
+- **Retrieval-with-limit** (Q1, Q2, Q5, Q6): query 带 LIMIT 5/10, recall 改为
+  对照 min(limit, |GT|) 算 (避免系统返回 5 但 GT 是 100 时 recall 被压低).
+  专用 helper: `_generic_retrieval_limit_evaluation` / `_evaluate_review_pairs_with_limit`.
+- **Aggregation** (Q3, Q4, Q8): 期望返回单数值. Q8 是 GROUP BY sentiment count,
+  专用 helper: `_evaluate_sentiment_counts` (按 sentiment 类型 dict 比, MAPE 加总).
+- **Ranking** (Q9, Q10): 用 `_generic_ranking_evaluation`, 内部用 Spearman /
+  Kendall tau 相关系数 (从 scipy.stats import 进来) 算排序相似度.
+- **Review pairs** (Q5/Q6 限制版 + Q7 全集): 返回 reviewId1/reviewId2 二元组,
+  评估时 *归一化* tuple (sorted([id1, id2])) 然后 set 比对 — 因为 (a,b) 跟
+  (b,a) 是同一对.
+
+★ ranking metric (Q9/Q10) 用 Spearman + Kendall tau:
+- Spearman ρ = rank correlation, 比较两序列的 rank 是否一致 (1 = 完全一致,
+  -1 = 完全反, 0 = 无关)
+- Kendall τ = 类似但用 "pair concordance" 衡量
+- 两者对 ranking 稳健, 不要求 exact 值相等只看相对顺序
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 from pathlib import Path

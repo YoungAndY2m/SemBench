@@ -5,6 +5,40 @@ Created on July 22, 2025
 
 AnimalsEvaluator Implementation based on generic_evaluator
 Uses DuckDB with gold SQL files to generate ground truth
+
+============================================================================
+教学注释 (Annotation Pass) — Animals scenario 的 evaluator
+============================================================================
+本文件是 GenericEvaluator (在 [src/evaluator/generic_evaluator.py](../../../evaluator/generic_evaluator.py)
+有详细注释) 的子类. 做 3 件事:
+
+1. **`_load_domain_data()`**: 把 image_data.csv + audio_data.csv 加载成
+   2 个 pandas DataFrame (data_path/data/sf_<scale_factor>/ 下).
+
+2. **`_get_ground_truth(qid)`**: 读 `query/gold_sql/Q<qid>.sql` 文件 (gold SQL,
+   即 paper 作者用 DuckDB 跑出来的 ground truth), 在内存 DuckDB 里把 image_data
+   + audio_data 注册成 'ImageData' / 'AudioData' 两个表, 跑 SQL 拿结果 dataframe,
+   存到 `raw_results/ground_truth/Q<qid>.csv`.
+
+3. **`_evaluate_qN(sys_results, ground_truth)`**: per-query 评估方法 (10 个 query):
+   - Q1, Q2 (aggregation): 用 `_generic_aggregation_evaluation` (期望单值 count)
+   - Q5-Q9 (retrieval, 普通 set 比对): 用 `_generic_retrieval_evaluation`
+   - Q3, Q4 (retrieval, top-1 with ties): 手写 — system 应只返回一个 city,
+     检查它在不在 gold's tied cities set 里. 命中 → (P=R=F=1), miss → 全 0.
+   - Q10 (retrieval, top-1 (city, station) with ties): 同 Q3/Q4 但元组比对,
+     带 case-insensitive 列名映射.
+
+**Aggregation vs Retrieval vs Single-accuracy** (3 大 metric type):
+- Aggregation: 一个数值 (count / sum / avg), 用 abs/rel error 评分
+- Retrieval: 一个 set / list (P / R / F1)
+- Single-accuracy: 二分类是否正确
+
+DuckDB `conn.register(name, df)` = 把 pandas DataFrame 注册成 DuckDB 表名, 后续
+SQL 直接用 'ImageData' 'AudioData' 跑; 用完 conn.close() 释放. 这种 *内存
+DuckDB + 注册 df* 模式很轻量, 不落盘.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 from pathlib import Path

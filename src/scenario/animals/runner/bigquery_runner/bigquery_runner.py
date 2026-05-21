@@ -4,6 +4,17 @@ Created on Aug 8, 2025
 @author: Jiale Lao
 
 Animals BigQuery system runner implementation.
+
+============================================================================
+教学注释 (Annotation Pass) — Animals scenario 的 BigQuery 适配器
+============================================================================
+本文件是 GenericBigQueryRunner (在 [generic_bigquery_runner.py](../../../../runner/generic_bigquery_runner/generic_bigquery_runner.py)
+有详细注释) 的薄子类, 只做 scenario-specific 配置:
+- model_name 默认 "gemini-2.5-flash" (中端)
+- skip_setup 默认 True (跳过数据初始化, 假设 BigQuery 表已经 ready)
+- scenario 名: animals
+core logic (jinja 模板 / cost 回收 / 重试) 全在父类, 这里只是把构造参数传上去.
+============================================================================
 """
 
 import time

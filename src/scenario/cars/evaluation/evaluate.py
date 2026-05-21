@@ -2,6 +2,35 @@
 Created on Jun 28, 2025
 
 @author: OlgaOvcharenko
+
+============================================================================
+教学注释 (Annotation Pass) — Cars scenario evaluator
+============================================================================
+跟 medical evaluator 同模式, 也是多模态 (cars + audio + image + text complaints).
+是 6 个 scenario evaluator 中 *最大* 的 (496 LoC), 包含 Q1-Q10 各自的 ground
+truth 生成 + 评估方法.
+
+特色 (跟 medical 差异):
+
+1. **full data vs sample data 路径**: `_load_domain_data` 总是先读 `full_data/*_full.csv`
+   (含 labels, 用于 GT 计算), 然后如果 scale_factor != 157376 (默认 SF), 用
+   sample data 的 id 列过滤 full data → 得到 subsample.
+   这是因为: 实验跑 sample, 但 ground truth 需要 full labels 才能算; 所以两边都加载,
+   按 id 取交集.
+
+2. **per-query GT generators**: `_generate_q<N>_ground_truth()` 10 个方法, 用
+   pandas + sklearn 算 ground truth. 跟 sql_queries.py 等价路径 (但 sql_queries
+   是 medical 专用; cars 没单独 sql_queries.py, 全在本文件).
+
+3. **metric type 分布**: 跟 movie/medical 类似 (retrieval / aggregation / ranking
+   混合); 具体每个 _evaluate_qN 的 docstring 自述.
+
+★ 共用导航 map: 看 [animals/evaluate.py](../../animals/evaluation/evaluate.py)
+理解 evaluator 通用框架; 看 [movie/evaluate.py](../../movie/evaluation/evaluate.py)
+理解 retrieval-with-limit / review-pairs / ranking 等特殊 helper.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 from pathlib import Path

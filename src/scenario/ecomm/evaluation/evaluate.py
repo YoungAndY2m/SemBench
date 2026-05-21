@@ -1,3 +1,26 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — Ecomm scenario 的 evaluator
+============================================================================
+本文件是 GenericEvaluator (在 [src/evaluator/generic_evaluator.py](../../../evaluator/generic_evaluator.py)
+有详细注释) 的薄子类. 是 6 个 scenario evaluator 中 *最瘦* 的, 因为 ecomm
+scenario 的 ground truth + per-query 评估方法都已经在 EcommScenario handler
+里 (见 [src/scenario/ecomm/ecomm_scenario.py](../ecomm_scenario.py)), 这里只是把
+两个接口转接过去:
+- `_get_ground_truth(qid)` → `scenario_handler.get_ground_truth(qid)`
+- `_evaluate_single_query(qid, sys, gt)` → 用 `scenario_handler.get_accuracy_measure_for_query(qid)`
+  拿到 measure type (retrieval / aggregation / single_accuracy), 再调
+  `GenericEvaluator.compute_accuracy_score(...)` 计算分数
+
+★ 注释说一句: docstring 里说 "Ideally, we would only have one intantiation of
+the scenario handler in run.py" — 即理想情况 scenario_handler 应该在 run.py 入口
+只 new 一次, 然后传给 runner + evaluator 共用; 当前 evaluator 自己又 new 一个
+EcommScenario, 是 in-progress refactor 的遗留.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 from pathlib import Path
 from typing import Any, Dict
 import sys

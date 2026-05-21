@@ -1,3 +1,18 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — Cars scenario 的 BigQuery 数据初始化
+============================================================================
+跟 animals/setup/bigquery.py 同模板 (BigQuery dataset + GCS + concurrent.futures
+upload + create EXTERNAL TABLE), 只是数据集名换成 cars_dataset, 表内容是
+4 modality (cars / audio / image / text). 详细 pattern 解释见
+[../../animals/setup/bigquery.py](../../animals/setup/bigquery.py) docstring.
+
+★ hashlib import 是 dead (跟 animals 一致); concurrent.futures 用来并发 upload 文件.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 import pandas as pd
 from google.cloud import storage, bigquery
 from google.api_core.exceptions import NotFound

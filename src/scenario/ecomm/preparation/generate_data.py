@@ -3,6 +3,31 @@
 """
 Data preparation for the E-commerce scenario.
 Handles downloading and processing the Fashion Product Images dataset.
+
+============================================================================
+教学注释 (Annotation Pass) — Ecomm scenario 的数据生成脚本 (standalone)
+============================================================================
+本文件是 ecomm scenario 的 data-gen 脚本 (369 LoC). 跟 [download.py](../download.py)
+功能有重叠 (都从 Drive 拉 ecomm.tar.gz 解压), 但本文件 *额外* 做 sample +
+处理成 parquet/CSV. 流程:
+
+1. **`download_from_google_drive()`**: 同 [download.py](../download.py),
+   拉 ecomm.tar.gz 到 `source_data/fashion-dataset/`. (重复实现, 历史遗留;
+   后续 refactor 应统一到 download.py.)
+
+2. **`pyarrow.parquet + duckdb` 处理**: 把 raw fashion-dataset/styles.json
+   转 parquet (DuckDB read_json + COPY TO 'parquet'); 再 sample 出
+   styles_details / image_mapping 子集.
+
+3. **输出**: `data/sf_<N>/styles.parquet` + `styles_details.parquet` +
+   `image_mapping.parquet` + 抽样后的 images/.
+
+★ ecomm 数据集 (Kaggle "Fashion Product Images") 总量 44K rows + ~22 GB JPG,
+sample 后只取一部分. paper 跑 ecomm scenario 主要测 LLM 在 *文本 product
+description + image* 上的语义 join / filter 能力.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 import os

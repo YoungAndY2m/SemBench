@@ -1,3 +1,24 @@
+"""
+============================================================================
+教学注释 (Annotation Pass) — MMQA scenario 的 BigQuery 数据初始化
+============================================================================
+跟 ecomm/setup/bigquery.py 同模式 (BigQuery dataset + GCS bucket + EXTERNAL
+TABLE for images), 但有 2 个差异:
+
+1. **CSV 而不是 parquet**: MMQA 用 `_upload_csv_to_bigquery`, 配
+   `bigquery.SourceFormat.CSV` + `skip_leading_rows=1` (跳 header) + `autodetect=True`
+   (自动推 schema). 表清单: ap_warrior / ben_piazza / ben_piazza_text_data /
+   lizzy_caplan_text_data / tampa_international_airport (跟 MMQA 7 个 query 关联).
+
+2. **图片支持 .jpg + .png** (ecomm 只 .jpg); 因为 MMQA 数据集图片格式不统一.
+
+★ project="bq-mm-benchmark" 是 paper 作者写死的 GCP 项目 id, 跑前用户必须
+改成自己的 project 或者用环境变量覆盖.
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
+"""
+
 import os
 
 from google.cloud import bigquery, storage

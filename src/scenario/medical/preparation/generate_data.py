@@ -16,6 +16,19 @@ https://drive.google.com/file/d/1P4V_RWWDMxz4X-oG65Ph5-K2gmNGFpP-/view?usp=shari
 
 To download only the X-ray and audio datasets, call this script with default arguments or use Google Drive link:
 https://drive.google.com/file/d/1v4--C7PE_SQDNZj6hZ8wNn4OvswIyu2s/view?usp=sharing
+
+============================================================================
+教学注释 (Annotation Pass) — Medical scenario 的数据生成脚本 (standalone)
+============================================================================
+本文件是 medical scenario 的 data-gen 脚本 (974 LoC). 跟 cars 同模式但有 5
+modality (patient 主表 + audio lung + image x_ray + text symptoms + image skin).
+流程类似 cars: download → sample → output full + sf_N 两套 CSV.
+
+★ 5 modality 各自来源不同 Kaggle 数据集 (上面 URL 清单), 合并时要按
+patient_id 关联 (一个患者可能同时有 audio + x_ray + text + skin 检查).
+
+注释说明: 本注释 pass 只增加 comment, 不改任何原始代码.
+============================================================================
 """
 
 import argparse
